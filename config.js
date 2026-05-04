@@ -31,7 +31,7 @@ export default {
     { name: 'EPG LATAM',   url: 'https://epg.pw/xmltv/epg_PA.xml', country: 'LATAM', enabled: true },
     { name: 'EPG USA',     url: 'https://epg.pw/xmltv/epg_US.xml', country: 'US', enabled: false },
   ],
-  SERVER_IP: process.env.SERVER_IP || '192.168.1.251',
+  SERVER_IP: process.env.SERVER_IP || '192.168.1.250',
 }
 
 

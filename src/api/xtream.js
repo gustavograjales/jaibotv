@@ -20,7 +20,7 @@ function userInfo(user) {
 }
 
 function serverInfo(req) {
-  const ip = config.SERVER_IP || "192.168.1.251"
+  const ip = config.SERVER_IP
   const port = config.port || 3000
   const base = `http://${ip}:${port}`
   return {
@@ -34,7 +34,7 @@ function serverInfo(req) {
 }
 
 function streamEntry(ch, req) {
-  const host = (req.headers["x-forwarded-host"] || req.hostname || "").split(":")[0] || "192.168.1.251"; const base = `${req.protocol||"http"}://${host}:${req.server?.port||3000}`;
+  const host = (req.headers["x-forwarded-host"] || req.hostname || "").split(":")[0] || config.SERVER_IP; const base = `${req.protocol||"http"}://${host}:${req.server?.port||3000}`;
   const url = ch.url_fhd||ch.url_hd||ch.url_sd||''
   const ext = url.includes('.m3u8')?'m3u8':'ts'
   return {
@@ -112,7 +112,7 @@ export default async function xtreamRoutes(fastify) {
     const user = authUser(username, password)
     if (!user) return reply.code(403).send('Unauthorized')
     if (type==='m3u'||type==='m3u_plus') {
-    const epgUrl = `${req.protocol||"http"}://${(req.headers["x-forwarded-host"]||req.hostname||"192.168.1.251").split(":")[0]}:${req.server?.port||3000}/xmltv.php?username=${username}&password=${password}`
+    const epgUrl = `${req.protocol||"http"}://${(req.headers["x-forwarded-host"]||req.hostname||config.SERVER_IP).split(":")[0]}:${req.server?.port||3000}/xmltv.php?username=${username}&password=${password}`
       const m3u = generateM3U({ epgUrl, catId: category_id||null })
       reply.header('Content-Type','application/x-mpegurl; charset=utf-8')
       reply.header('Content-Disposition','attachment; filename="playlist.m3u"')

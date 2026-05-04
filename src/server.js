@@ -69,9 +69,9 @@ try {
   console.log('\n' + '═'.repeat(52))
   console.log(`🚀 JaiboTV corriendo en http://0.0.0.0:${config.port}`)
   console.log('═'.repeat(52))
-  console.log(`📺 Xtream:  http://192.168.1.251:${config.port}`)
-  console.log(`🌐 Admin:   http://192.168.1.251:${config.port}/admin/`)
-  console.log(`❤️  Health:  http://192.168.1.251:${config.port}/health`)
+  console.log(`📺 Xtream:  http://${config.SERVER_IP}:${config.port}`)
+  console.log(`🌐 Admin:   http://${config.SERVER_IP}:${config.port}/admin/`)
+  console.log(`❤️  Health:  http://${config.SERVER_IP}:${config.port}/health`)
   console.log('═'.repeat(52) + '\n')
 } catch(err) {
   fastify.log.error(err)
