@@ -141,7 +141,7 @@ export default async function xtreamRoutes(fastify) {
     try {
       const src = db.prepare(`
         SELECT url FROM stream_sources
-        WHERE channel_id=? AND status != 'error'
+        WHERE channel_id=? AND status = 'ok'
         ORDER BY priority ASC LIMIT 1
       `).get(ch.id)
       url = src?.url
