@@ -1,0 +1,42 @@
+# Dependencias
+node_modules/
+
+# Base de datos (NO subir, tiene datos de canales)
+data/iptv.db
+data/iptv.db-shm
+data/iptv.db-wal
+data/m3u-cache/
+data/epg-cache/
+data/logo-index.json
+
+# Media (muy pesado)
+media/cache/
+media/movies/
+media/series/
+media/subs/
+
+# Logs
+*.log
+logs/
+
+# Backups
+*.bak
+*.backup
+
+# Variables de entorno (secretos)
+.env
+.env.local
+.env.production
+config.local.js
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Export temporal
+export/

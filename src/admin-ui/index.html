@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JaiboTV Admin</title>
+<style>
+:root{
+  --bg:#0a0a0f;--s1:#111118;--s2:#1a1a26;--bd:#2a2a40;
+  --ac:#00e5ff;--ac2:#ff3d71;--ac3:#a259ff;
+  --tx:#e8e8f0;--tx2:#8888aa;--gn:#00ff88;--yw:#ffd60a;--or:#ff9500;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 20%,rgba(0,229,255,.04),transparent 60%),radial-gradient(ellipse at 80% 80%,rgba(162,89,255,.04),transparent 60%);pointer-events:none}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--bd);display:flex;align-items:center;height:58px;padding:0 20px;gap:4px}
+.logo{font-size:1.1rem;font-weight:800;margin-right:16px;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px var(--ac);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.nav-btn{padding:6px 14px;border-radius:6px;border:none;background:none;color:var(--tx2);cursor:pointer;font-size:.82rem;font-weight:600;transition:all .15s}
+.nav-btn:hover{color:var(--tx);background:var(--s2)}
+.nav-btn.active{color:var(--ac);background:rgba(0,229,255,.1)}
+.nav-sp{flex:1}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;font-size:.65rem;font-weight:700;padding:0 5px;margin-left:4px;background:rgba(0,229,255,.15);color:var(--ac)}
+
+/* PANELS */
+.panel{display:none;flex-direction:column;height:calc(100vh - 58px);overflow:hidden;position:relative;z-index:1}
+.panel.active{display:flex}
+.scrollable{flex:1;overflow-y:auto;padding:20px}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:12px}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:16px}
+.stat-label{font-size:.72rem;color:var(--tx2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.stat-val{font-size:1.8rem;font-weight:700;font-family:'Courier New',monospace}
+.stat-sub{font-size:.75rem;color:var(--tx2);margin-top:2px}
+
+/* BUTTONS */
+.btn{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-weight:600;font-size:.8rem;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--ac);color:#000}
+.btn-primary:hover{background:#fff}
+.btn-secondary{background:var(--s2);color:var(--tx);border:1px solid var(--bd)}
+.btn-secondary:hover{border-color:var(--ac);color:var(--ac)}
+.btn-danger{background:transparent;color:var(--ac2);border:1px solid rgba(255,61,113,.3)}
+.btn-danger:hover{background:var(--ac2);color:#fff}
+.btn-sm{padding:4px 10px;font-size:.74rem}
+.btn-xs{padding:3px 8px;font-size:.7rem}
+
+/* TOOLBAR */
+.toolbar{padding:12px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--s1);flex-shrink:0}
+.search-wrap{display:flex;align-items:center;gap:7px;background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:0 11px;height:34px;flex:1;max-width:280px}
+.search-wrap:focus-within{border-color:var(--ac)}
+.search-wrap input{background:none;border:none;outline:none;color:var(--tx);font-size:.82rem;width:100%}
+select.fi{background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:6px 10px;color:var(--tx);font-size:.8rem;outline:none}
+
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.83rem}
+th{padding:10px 12px;text-align:left;font-size:.7rem;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bd);background:var(--s2)}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.02)}
+.ch-logo-sm{width:32px;height:32px;border-radius:5px;object-fit:contain;background:var(--bg);border:1px solid var(--bd)}
+.q-badge{font-size:.65rem;font-weight:700;padding:2px 6px;border-radius:4px;font-family:monospace}
+.q-fhd{background:rgba(0,229,255,.12);color:var(--ac)}
+.q-hd{background:rgba(162,89,255,.12);color:var(--ac3)}
+.q-sd{background:rgba(255,214,10,.1);color:var(--yw)}
+.q-off{opacity:.2}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
+.s-ok{background:var(--gn);box-shadow:0 0 6px var(--gn)}
+.s-err{background:var(--ac2)}
+.s-load{background:var(--or);animation:pulse 1s infinite}
+.s-pend{background:var(--tx2)}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--s1);border:1px solid var(--bd);border-radius:14px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;transform:scale(.96);transition:transform .2s}
+.overlay.open .modal{transform:scale(1)}
+.modal-hd{padding:16px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--s1);z-index:1}
+.modal-title{font-size:1rem;font-weight:700}
+.modal-bd{padding:20px;display:flex;flex-direction:column;gap:14px}
+.modal-ft{padding:14px 20px;border-top:1px solid var(--bd);display:flex;gap:8px;justify-content:flex-end}
+.btn-icon{width:30px;height:30px;border-radius:6px;border:1px solid var(--bd);background:var(--s2);color:var(--tx2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.btn-icon:hover{border-color:var(--ac);color:var(--ac)}
+
+/* FORM */
+.fg{display:flex;flex-direction:column;gap:5px}
+.fl{font-size:.72rem;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px}
+.fi{background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:9px 12px;color:var(--tx);font-size:.85rem;outline:none;width:100%;transition:border-color .15s}
+.fi:focus{border-color:var(--ac)}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* PICKER */
+.picker-wrap{position:relative}
+.picker-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--s2);border:1px solid var(--bd);border-radius:8px;max-height:220px;overflow-y:auto;z-index:50;display:none}
+.picker-results.open{display:block}
+.pick-item{padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.04);transition:background .1s}
+.pick-item:hover{background:var(--s1)}
+.pick-item:last-child{border-bottom:none}
+.pick-logo{width:24px;height:24px;object-fit:contain;border-radius:3px;background:var(--bg)}
+.pick-name{font-size:.82rem;font-weight:600;flex:1}
+.pick-sub{font-size:.68rem;color:var(--ac);font-family:monospace}
+.pick-src{font-size:.65rem;color:var(--tx2)}
+.score-pill{font-size:.65rem;padding:1px 6px;border-radius:10px;background:rgba(0,255,136,.15);color:var(--gn)}
+
+/* NOTICE */
+.notice{padding:10px 14px;border-radius:7px;font-size:.8rem;display:flex;align-items:flex-start;gap:8px;line-height:1.4}
+.n-info{background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2);color:var(--ac)}
+.n-warn{background:rgba(255,149,0,.07);border:1px solid rgba(255,149,0,.2);color:var(--or)}
+.n-ok{background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.2);color:var(--gn)}
+.n-err{background:rgba(255,61,113,.07);border:1px solid rgba(255,61,113,.2);color:var(--ac2)}
+
+/* LOG */
+.log-box{background:var(--bg);border:1px solid var(--bd);border-radius:7px;padding:10px 12px;font-family:monospace;font-size:.72rem;height:130px;overflow-y:auto;line-height:1.7}
+.log-ok{color:var(--gn)}
+.log-err{color:var(--ac2)}
+.log-warn{color:var(--yw)}
+.log-info{color:var(--ac)}
+
+/* PAGINATION */
+.pager{display:flex;align-items:center;gap:8px;padding:12px 0;font-size:.82rem;color:var(--tx2)}
+.pager button{padding:4px 10px;border-radius:5px;border:1px solid var(--bd);background:var(--s2);color:var(--tx);cursor:pointer;font-size:.78rem}
+.pager button:hover{border-color:var(--ac);color:var(--ac)}
+.pager button:disabled{opacity:.3;cursor:default}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:60px 20px;color:var(--tx2);text-align:center}
+.empty-ico{font-size:2.5rem;opacity:.3}
+.tag{display:inline-block;font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:20px}
+.spin{animation:spin .8s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo"><div class="logo-dot"></div>Jaibo<span style="color:var(--ac)">TV</span> <span style="font-size:.65rem;color:var(--tx2);font-weight:400">Admin</span></div>
+  <button class="nav-btn active" onclick="showPanel('dashboard')">📊 Dashboard</button>
+  <button class="nav-btn" onclick="showPanel('channels')">📺 Canales<span class="badge" id="nb-channels">0</span></button>
+  <button class="nav-btn" onclick="showPanel('sources')">📡 Fuentes M3U<span class="badge" id="nb-sources">0</span></button>
+  <button class="nav-btn" onclick="showPanel('epg')">📅 EPG<span class="badge" id="nb-epg">0</span></button>
+  <button class="nav-btn" onclick="showPanel('users')">👥 Usuarios<span class="badge" id="nb-users">0</span></button>
+  <div class="nav-sp"></div>
+  <button class="btn btn-secondary btn-sm" onclick="refreshAll()">⟳ Actualizar todo</button>
+</nav>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div class="panel active" id="panel-dashboard">
+  <div class="scrollable">
+    <div class="card-grid" id="stat-cards">
+      <div class="stat-card"><div class="stat-label">Canales</div><div class="stat-val" id="s-channels">—</div><div class="stat-sub">activos</div></div>
+      <div class="stat-card"><div class="stat-label">Con EPG</div><div class="stat-val" style="color:var(--gn)" id="s-epg">—</div><div class="stat-sub">asignados</div></div>
+      <div class="stat-card"><div class="stat-label">FHD</div><div class="stat-val" style="color:var(--ac)" id="s-fhd">—</div><div class="stat-sub">streams</div></div>
+      <div class="stat-card"><div class="stat-label">HD</div><div class="stat-val" style="color:var(--ac3)" id="s-hd">—</div><div class="stat-sub">streams</div></div>
+      <div class="stat-card"><div class="stat-label">IDs EPG</div><div class="stat-val" style="color:var(--yw)" id="s-epgidx">—</div><div class="stat-sub">indexados</div></div>
+      <div class="stat-card"><div class="stat-label">Logos</div><div class="stat-val" style="color:var(--or)" id="s-logos">—</div><div class="stat-sub">indexados</div></div>
+      <div class="stat-card"><div class="stat-label">Usuarios</div><div class="stat-val" id="s-users">—</div><div class="stat-sub">activos</div></div>
+      <div class="stat-card"><div class="stat-label">Fuentes M3U</div><div class="stat-val" id="s-m3u">—</div><div class="stat-sub">configuradas</div></div>
+    </div>
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:12px;font-size:.9rem">📋 Log de actualizaciones recientes</div>
+      <div class="log-box" id="dash-log">Cargando...</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:10px;font-size:.9rem">📡 Fuentes M3U</div>
+        <div id="dash-m3u-sources"></div>
+      </div>
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:10px;font-size:.9rem">📅 Fuentes EPG</div>
+        <div id="dash-epg-sources"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CANALES ═══ -->
+<div class="panel" id="panel-channels">
+  <div class="toolbar">
+    <div class="search-wrap"><span style="color:var(--tx2)">🔍</span><input type="text" id="ch-search" placeholder="Buscar canal..." oninput="loadChannels()"></div>
+    <select class="fi" id="ch-cat-filter" onchange="loadChannels()" style="width:auto"></select>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn btn-secondary btn-sm" onclick="bulkAutoEpg()">🔗 Auto EPG masivo</button>
+      <button class="btn btn-secondary btn-sm" onclick="bulkAutoLogo()">🖼️ Auto logos masivo</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddChannel()">+ Canal</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+    <div class="table-wrap" style="flex:1;overflow-y:auto;padding:0 20px">
+      <table>
+        <thead><tr>
+          <th>Logo</th><th>Canal</th><th>Categoría</th>
+          <th>EPG ID</th><th>Calidades</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="ch-tbody"></tbody>
+      </table>
+      <div class="pager">
+        <button onclick="chPage--; loadChannels()" id="ch-prev">← Anterior</button>
+        <span id="ch-pager-info"></span>
+        <button onclick="chPage++; loadChannels()" id="ch-next">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FUENTES M3U ═══ -->
+<div class="panel" id="panel-sources">
+  <div class="toolbar">
+    <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-source')">+ Agregar fuente M3U</button>
+    <button class="btn btn-secondary btn-sm" onclick="api('POST','/admin/sources/m3u/refresh-all').then(()=>log('Actualizando todas las fuentes M3U...','info')).then(loadSources)">⟳ Actualizar todas</button>
+    <button class="btn btn-secondary btn-sm" onclick="openModal('modal-import-text')">📋 Importar M3U texto</button>
+  </div>
+  <div class="scrollable" id="sources-list"></div>
+</div>
+
+<!-- ═══ EPG ═══ -->
+<div class="panel" id="panel-epg">
+  <div class="toolbar">
+    <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-epg')">+ Agregar fuente EPG</button>
+    <button class="btn btn-secondary btn-sm" onclick="api('POST','/admin/sources/epg/refresh-all').then(()=>log('Actualizando EPGs...','info')).then(loadEpgSources)">⟳ Actualizar todas</button>
+    <button class="btn btn-secondary btn-sm" onclick="api('POST','/admin/logos/rebuild').then(()=>log('Reconstruyendo índice de logos...','info'))">🖼️ Reindexar logos</button>
+    <div class="stat" style="margin-left:auto;font-size:.8rem;color:var(--tx2)">IDs: <strong id="epg-total-ids" style="color:var(--ac)">—</strong> | Logos: <strong id="logo-total" style="color:var(--or)">—</strong></div>
+  </div>
+  <div class="scrollable" id="epg-list"></div>
+</div>
+
+<!-- ═══ USUARIOS ═══ -->
+<div class="panel" id="panel-users">
+  <div class="toolbar">
+    <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-user')">+ Nuevo usuario</button>
+  </div>
+  <div class="scrollable">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Usuario</th><th>Plan</th><th>Streams</th>
+          <th>Status</th><th>Expira</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ MODALES ══════════════════════ -->
+
+<!-- CANAL -->
+<div class="overlay" id="modal-channel">
+<div class="modal">
+  <div class="modal-hd"><div class="modal-title" id="modal-ch-title">➕ Nuevo Canal</div><button class="btn-icon" onclick="closeModal('modal-channel')">✕</button></div>
+  <div class="modal-bd">
+    <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="f-name" placeholder="Ej: CNN en Español"></div>
+    <div class="fg-row">
+      <div class="fg"><label class="fl">Categoría</label><select class="fi" id="f-cat"></select></div>
+      <div class="fg"><label class="fl">País</label><input class="fi" id="f-country" placeholder="MX / ES / US..."></div>
+    </div>
+
+    <!-- LOGO con picker -->
+    <div class="fg">
+      <label class="fl">Logo URL <span style="color:var(--tx2);font-weight:400">(escribe para buscar)</span></label>
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <div style="flex:1">
+          <div class="picker-wrap">
+            <input class="fi" id="f-logo" placeholder="https://... o busca por nombre" oninput="searchLogoPicker(this.value)" autocomplete="off">
+            <div class="picker-results" id="logo-results"></div>
+          </div>
+        </div>
+        <div id="logo-preview" style="width:48px;height:48px;border-radius:8px;background:var(--bg);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0">📺</div>
+      </div>
+    </div>
+
+    <!-- EPG ID con picker -->
+    <div class="fg">
+      <label class="fl">EPG ID <span style="color:var(--tx2);font-weight:400">(escribe para buscar IDs disponibles)</span></label>
+      <div class="picker-wrap">
+        <input class="fi" id="f-epg" placeholder="Ej: CNN — escribe para buscar..." oninput="searchEpgPicker(this.value)" autocomplete="off">
+        <div class="picker-results" id="epg-results"></div>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="fl">Streams</label>
+      <div class="notice n-info" style="margin-bottom:8px">Agrega al menos una URL. FHD tiene prioridad sobre HD y SD.</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">
+        <span style="font-size:.68rem;font-weight:700;width:32px;color:var(--ac);font-family:monospace">FHD</span>
+        <input class="fi" id="f-url-fhd" placeholder="URL 1080p" style="flex:1">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">
+        <span style="font-size:.68rem;font-weight:700;width:32px;color:var(--ac3);font-family:monospace">HD</span>
+        <input class="fi" id="f-url-hd" placeholder="URL 720p" style="flex:1">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:.68rem;font-weight:700;width:32px;color:var(--yw);font-family:monospace">SD</span>
+        <input class="fi" id="f-url-sd" placeholder="URL 480p/360p" style="flex:1">
+      </div>
+    </div>
+  </div>
+  <div class="modal-ft">
+    <button class="btn btn-secondary" onclick="closeModal('modal-channel')">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveChannel()">💾 Guardar</button>
+  </div>
+</div>
+</div>
+
+<!-- FUENTE M3U -->
+<div class="overlay" id="modal-add-source">
+<div class="modal">
+  <div class="modal-hd"><div class="modal-title">📡 Agregar Fuente M3U</div><button class="btn-icon" onclick="closeModal('modal-add-source')">✕</button></div>
+  <div class="modal-bd">
+    <div class="notice n-info">La lista se importará ahora y se actualizará automáticamente cada 7 días.</div>
+    <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="src-name" placeholder="Ej: Lista Principal MX"></div>
+    <div class="fg"><label class="fl">URL de la lista M3U</label><input class="fi" id="src-url" placeholder="https://ejemplo.com/lista.m3u8"></div>
+    <div class="fg-row">
+      <div class="fg"><label class="fl">Categoría por defecto</label><select class="fi" id="src-cat"></select></div>
+      <div class="fg"><label class="fl">Deduplicar por</label>
+        <select class="fi" id="src-dedup">
+          <option value="name">Nombre</option>
+          <option value="url">URL</option>
+          <option value="both">Nombre y URL</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="modal-ft">
+    <button class="btn btn-secondary" onclick="closeModal('modal-add-source')">Cancelar</button>
+    <button class="btn btn-primary" onclick="addSource()">📡 Importar</button>
+  </div>
+</div>
+</div>
+
+<!-- IMPORTAR M3U TEXTO -->
+<div class="overlay" id="modal-import-text">
+<div class="modal">
+  <div class="modal-hd"><div class="modal-title">📋 Importar M3U (texto)</div><button class="btn-icon" onclick="closeModal('modal-import-text')">✕</button></div>
+  <div class="modal-bd">
+    <div class="notice n-warn">Los canales nuevos se agregarán. Los duplicados se actualizarán.</div>
+    <div class="fg">
+      <label class="fl">Contenido M3U</label>
+      <textarea class="fi" id="import-text" style="height:180px;resize:none;font-family:monospace;font-size:.76rem" placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-id=&quot;...&quot; tvg-logo=&quot;...&quot; group-title=&quot;Noticias&quot;,CNN&#10;http://stream.url/stream.m3u8"></textarea>
+    </div>
+  </div>
+  <div class="modal-ft">
+    <button class="btn btn-secondary" onclick="closeModal('modal-import-text')">Cancelar</button>
+    <button class="btn btn-primary" onclick="importText()">⬆ Importar</button>
+  </div>
+</div>
+</div>
+
+<!-- FUENTE EPG -->
+<div class="overlay" id="modal-add-epg">
+<div class="modal">
+  <div class="modal-hd"><div class="modal-title">📅 Agregar Fuente EPG</div><button class="btn-icon" onclick="closeModal('modal-add-epg')">✕</button></div>
+  <div class="modal-bd">
+    <div class="notice n-info">Se descargará el XMLTV y se indexarán todos los IDs de canales disponibles.</div>
+    <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="epg-name" placeholder="Ej: GlobeTV México"></div>
+    <div class="fg"><label class="fl">URL del XMLTV *</label><input class="fi" id="epg-url" placeholder="https://..."></div>
+    <div class="fg"><label class="fl">País</label><input class="fi" id="epg-country" placeholder="MX / ES / AR..."></div>
+    <div class="fg">
+      <label class="fl">EPGs rápidos — GlobeTV</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="epg-presets"></div>
+    </div>
+  </div>
+  <div class="modal-ft">
+    <button class="btn btn-secondary" onclick="closeModal('modal-add-epg')">Cancelar</button>
+    <button class="btn btn-primary" onclick="addEpgSource()">📅 Agregar</button>
+  </div>
+</div>
+</div>
+
+<!-- USUARIO -->
+<div class="overlay" id="modal-add-user">
+<div class="modal">
+  <div class="modal-hd"><div class="modal-title" id="modal-user-title">👤 Nuevo Usuario</div><button class="btn-icon" onclick="closeModal('modal-add-user')">✕</button></div>
+  <div class="modal-bd">
+    <div class="fg-row">
+      <div class="fg"><label class="fl">Usuario *</label><input class="fi" id="u-username" placeholder="usuario123"></div>
+      <div class="fg"><label class="fl">Contraseña *</label><input class="fi" id="u-password" placeholder="contraseña" type="password"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label class="fl">Plan</label>
+        <select class="fi" id="u-plan">
+          <option value="basic">Basic (1 stream)</option>
+          <option value="pro">Pro (2 streams)</option>
+          <option value="family">Family (4 streams)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Max streams</label><input class="fi" id="u-streams" type="number" value="1" min="1" max="10"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label class="fl">Status</label>
+        <select class="fi" id="u-status">
+          <option value="active">Activo</option>
+          <option value="suspended">Suspendido</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Expira (opcional)</label><input class="fi" id="u-expires" type="date"></div>
+    </div>
+    <div class="fg"><label class="fl">Notas</label><input class="fi" id="u-notes" placeholder="Notas internas..."></div>
+  </div>
+  <div class="modal-ft">
+    <button class="btn btn-secondary" onclick="closeModal('modal-add-user')">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveUser()">💾 Guardar</button>
+  </div>
+</div>
+</div>
+
+<script>
+// ═══ CONFIG ═══
+const API = ''   // mismo origen
+let token = localStorage.getItem('jaibo_token') || ''
+let editingChId = null
+let editingUserId = null
+let chPage = 1
+const chLimit = 50
+let categories = []
+
+// ═══ API HELPER ═══
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  }
+  if (body) opts.body = JSON.stringify(body)
+  const r = await fetch(API + path, opts)
+  if (!r.ok) {
+    const e = await r.json().catch(()=>({error: r.statusText}))
+    throw new Error(e.error || r.statusText)
+  }
+  return r.json().catch(()=>({}))
+}
+
+// ═══ LOG ═══
+function log(msg, type='info') {
+  const el = document.getElementById('dash-log')
+  if (!el) return
+  const t = new Date().toLocaleTimeString('es-MX')
+  const cls = type==='ok'?'log-ok':type==='err'?'log-err':type==='warn'?'log-warn':'log-info'
+  el.innerHTML += `<div><span style="color:var(--tx2)">${t}</span> <span class="${cls}">${msg}</span></div>`
+  el.scrollTop = el.scrollHeight
+}
+
+// ═══ PANELS ═══
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'))
+  document.getElementById('panel-'+id).classList.add('active')
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'))
+  event.target.classList.add('active')
+  if(id==='dashboard') loadDashboard()
+  if(id==='channels')  { loadCategories(); loadChannels() }
+  if(id==='sources')   loadSources()
+  if(id==='epg')       loadEpgSources()
+  if(id==='users')     loadUsers()
+}
+
+// ═══ MODALES ═══
+function openModal(id) { document.getElementById(id).classList.add('open') }
+function closeModal(id) { document.getElementById(id).classList.remove('open') }
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}))
+
+// ═══ DASHBOARD ═══
+async function loadDashboard() {
+  try {
+    const s = await api('GET','/admin/stats')
+    document.getElementById('s-channels').textContent = s.channels
+    document.getElementById('s-epg').textContent = s.channels_epg
+    document.getElementById('s-fhd').textContent = s.url_fhd
+    document.getElementById('s-hd').textContent = s.url_hd
+    document.getElementById('s-epgidx').textContent = s.epg_index
+    document.getElementById('s-users').textContent = s.users
+    document.getElementById('s-m3u').textContent = s.m3u_sources
+
+    document.getElementById('nb-channels').textContent = s.channels
+    document.getElementById('nb-sources').textContent = s.m3u_sources
+    document.getElementById('nb-epg').textContent = s.epg_sources
+    document.getElementById('nb-users').textContent = s.users
+
+    // Logos stat
+    const ls = await api('GET','/admin/logos/stats').catch(()=>({total:0}))
+    document.getElementById('s-logos').textContent = ls.total
+    document.getElementById('logo-total').textContent = ls.total
+    document.getElementById('epg-total-ids').textContent = s.epg_index
+
+    // Log
+    const logEl = document.getElementById('dash-log')
+    logEl.innerHTML = ''
+    ;(s.recent_logs||[]).forEach(l=>{
+      const cls = l.status==='ok'?'log-ok':'log-err'
+      logEl.innerHTML += `<div><span style="color:var(--tx2)">${l.created_at?.slice(11,19)}</span> <span class="${cls}">[${l.type?.toUpperCase()}] ${l.message}</span></div>`
+    })
+    if (!s.recent_logs?.length) logEl.innerHTML = '<div style="color:var(--tx2)">Sin actividad reciente</div>'
+
+    // Sources summary
+    const m3uSrcs = await api('GET','/admin/sources/m3u').catch(()=>[])
+    const epgSrcs = await api('GET','/admin/sources/epg').catch(()=>[])
+    document.getElementById('dash-m3u-sources').innerHTML = m3uSrcs.length
+      ? m3uSrcs.map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);font-size:.82rem">
+          <span class="status-dot ${dotClass(s.status)}"></span>
+          <span style="flex:1">${s.name}</span>
+          <span style="color:var(--tx2)">${s.channel_count} canales</span>
+        </div>`).join('')
+      : '<div class="empty"><div>Sin fuentes M3U</div></div>'
+    document.getElementById('dash-epg-sources').innerHTML = epgSrcs.length
+      ? epgSrcs.map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);font-size:.82rem">
+          <span class="status-dot ${dotClass(s.status)}"></span>
+          <span style="flex:1">${s.name}</span>
+          <span style="color:var(--tx2)">${s.channel_count} IDs</span>
+        </div>`).join('')
+      : '<div class="empty"><div>Sin fuentes EPG</div></div>'
+  } catch(e) { log('Error cargando dashboard: '+e.message, 'err') }
+}
+
+function dotClass(s) {
+  return s==='ok'?'s-ok':s==='error'?'s-err':s==='loading'?'s-load':'s-pend'
+}
+
+// ═══ CATEGORÍAS ═══
+async function loadCategories() {
+  categories = await api('GET','/admin/categories').catch(()=>[])
+  const catSel = document.getElementById('f-cat')
+  const chFilter = document.getElementById('ch-cat-filter')
+  const srcCat = document.getElementById('src-cat')
+  const opts = categories.map(c=>`<option value="${c.id}">${c.icon||'📺'} ${c.name}</option>`).join('')
+  catSel.innerHTML = opts
+  chFilter.innerHTML = '<option value="">Todas las categorías</option>' + opts
+  srcCat.innerHTML = '<option value="">Sin categoría</option>' + opts
+}
+
+// ═══ CANALES ═══
+async function loadChannels() {
+  const search = document.getElementById('ch-search')?.value || ''
+  const cat    = document.getElementById('ch-cat-filter')?.value || ''
+  try {
+    const data = await api('GET', `/admin/channels?page=${chPage}&limit=${chLimit}&search=${encodeURIComponent(search)}&cat=${cat}`)
+    const tbody = document.getElementById('ch-tbody')
+    if (!data.channels?.length) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-ico">📡</div><div>Sin canales</div></div></td></tr>`
+      return
+    }
+    tbody.innerHTML = data.channels.map(ch => {
+      const fhd = !!ch.url_fhd, hd = !!ch.url_hd, sd = !!ch.url_sd
+      const logo = ch.logo
+        ? `<img src="${ch.logo}" class="ch-logo-sm" onerror="this.style.display='none'" alt="">`
+        : `<span style="font-size:1.2rem">${ch.cat_icon||'📺'}</span>`
+      return `<tr>
+        <td>${logo}</td>
+        <td><div style="font-weight:600">${ch.name}</div><div style="font-size:.72rem;color:var(--tx2)">${ch.country||''}</div></td>
+        <td><span style="font-size:.78rem;color:var(--tx2)">${ch.cat_name||'—'}</span></td>
+        <td><span style="font-size:.72rem;font-family:monospace;color:${ch.epg_id?'var(--ac)':'var(--tx2)'}">${ch.epg_id||'—'}</span></td>
+        <td>
+          <span class="q-badge q-fhd ${fhd?'':'q-off'}">FHD</span>
+          <span class="q-badge q-hd ${hd?'':'q-off'}">HD</span>
+          <span class="q-badge q-sd ${sd?'':'q-off'}">SD</span>
+        </td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-secondary btn-xs" onclick="autoEpg(${ch.id})">🔗 EPG</button>
+            <button class="btn btn-secondary btn-xs" onclick="autoLogo(${ch.id})">🖼️</button>
+            <button class="btn btn-secondary btn-xs" onclick="editChannel(${ch.id})">✏️</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteChannel(${ch.id},'${ch.name}')">🗑</button>
+          </div>
+        </td>
+      </tr>`
+    }).join('')
+
+    // Paginación
+    const total = data.total
+    const pages = Math.ceil(total / chLimit)
+    document.getElementById('ch-pager-info').textContent = `Página ${chPage} de ${pages} (${total} canales)`
+    document.getElementById('ch-prev').disabled = chPage <= 1
+    document.getElementById('ch-next').disabled = chPage >= pages
+  } catch(e) { log('Error canales: '+e.message,'err') }
+}
+
+function openAddChannel() {
+  editingChId = null
+  document.getElementById('modal-ch-title').textContent = '➕ Nuevo Canal'
+  ;['f-name','f-country','f-logo','f-epg','f-url-fhd','f-url-hd','f-url-sd'].forEach(id=>document.getElementById(id).value='')
+  document.getElementById('logo-preview').innerHTML = '📺'
+  loadCategories()
+  hideAllPickers()
+  openModal('modal-channel')
+}
+
+async function editChannel(id) {
+  editingChId = id
+  await loadCategories()
+  const ch = await api('GET', `/admin/channels/${id}`)
+  document.getElementById('modal-ch-title').textContent = '✏️ Editar Canal'
+  document.getElementById('f-name').value    = ch.name || ''
+  document.getElementById('f-cat').value     = ch.category_id || ''
+  document.getElementById('f-country').value = ch.country || ''
+  document.getElementById('f-logo').value    = ch.logo || ''
+  document.getElementById('f-epg').value     = ch.epg_id || ''
+  document.getElementById('f-url-fhd').value = ch.url_fhd || ''
+  document.getElementById('f-url-hd').value  = ch.url_hd  || ''
+  document.getElementById('f-url-sd').value  = ch.url_sd  || ''
+  updateLogoPreview(ch.logo)
+  hideAllPickers()
+  openModal('modal-channel')
+}
+
+function updateLogoPreview(url) {
+  const p = document.getElementById('logo-preview')
+  url = url || document.getElementById('f-logo').value
+  p.innerHTML = url
+    ? `<img src="${url}" style="width:44px;height:44px;object-fit:contain;border-radius:6px" onerror="this.parentElement.innerHTML='📺'" alt="">`
+    : '📺'
+}
+
+async function saveChannel() {
+  const name    = document.getElementById('f-name').value.trim()
+  const url_fhd = document.getElementById('f-url-fhd').value.trim()
+  const url_hd  = document.getElementById('f-url-hd').value.trim()
+  const url_sd  = document.getElementById('f-url-sd').value.trim()
+  if (!name) return alert('El nombre es obligatorio')
+  if (!url_fhd && !url_hd && !url_sd) return alert('Agrega al menos una URL de stream')
+  const body = {
+    name,
+    category_id: parseInt(document.getElementById('f-cat').value)||null,
+    country:  document.getElementById('f-country').value.trim(),
+    logo:     document.getElementById('f-logo').value.trim(),
+    epg_id:   document.getElementById('f-epg').value.trim(),
+    url_fhd, url_hd, url_sd,
+  }
+  try {
+    if (editingChId) await api('PUT', `/admin/channels/${editingChId}`, body)
+    else await api('POST', '/admin/channels', body)
+    closeModal('modal-channel')
+    loadChannels()
+    log(`Canal ${name} ${editingChId?'actualizado':'creado'}`, 'ok')
+  } catch(e) { alert('Error: '+e.message) }
+}
+
+async function deleteChannel(id, name) {
+  if (!confirm(`¿Eliminar "${name}"?`)) return
+  await api('DELETE', `/admin/channels/${id}`)
+  loadChannels()
+  log(`Canal ${name} eliminado`, 'warn')
+}
+
+async function autoEpg(id) {
+  try {
+    const m = await api('POST', `/admin/channels/${id}/auto-epg`, { apply: false })
+    if (confirm(`Mejor coincidencia EPG:\n\n${m.name}\nID: ${m.epg_id}\nFuente: ${m.source_name}\nConfianza: ${m.confidence}%\n\n¿Asignar?`)) {
+      await api('POST', `/admin/channels/${id}/auto-epg`, { apply: true })
+      loadChannels()
+      log(`EPG asignado: ${m.epg_id} (${m.confidence}%)`, 'ok')
+    }
+  } catch(e) { alert('Sin coincidencia EPG para este canal') }
+}
+
+async function autoLogo(id) {
+  try {
+    const m = await api('POST', `/admin/channels/${id}/auto-logo`, { apply: false })
+    if (confirm(`Logo encontrado:\n\n${m.name} (${m.country})\nScore: ${Math.round(m.score*100)}%\n\n¿Asignar?`)) {
+      await api('POST', `/admin/channels/${id}/auto-logo`, { apply: true })
+      loadChannels()
+      log(`Logo asignado: ${m.name}`, 'ok')
+    }
+  } catch(e) { alert('Sin logo encontrado para este canal') }
+}
+
+async function bulkAutoEpg() {
+  if (!confirm('¿Auto-asignar EPG IDs a todos los canales sin EPG? (confianza ≥70%)')) return
+  const r = await api('POST', '/admin/channels/bulk-auto-epg')
+  loadChannels()
+  log(`Auto EPG: ${r.matched} de ${r.total} canales asignados`, 'ok')
+}
+
+async function bulkAutoLogo() {
+  if (!confirm('¿Auto-asignar logos a todos los canales sin logo? (score ≥70%)')) return
+  const r = await api('POST', '/admin/channels/bulk-auto-logo')
+  loadChannels()
+  log(`Auto logos: ${r.matched} de ${r.total} canales con logo`, 'ok')
+}
+
+// ═══ EPG PICKER ═══
+let epgTimer = null
+function srcLabel(sourceName) {
+  const s = sourceName || ''
+  if (s.includes('PlutoTV México')) return {label:'PlutoTV MX', color:'#00b4d8'}
+  if (s.includes('PlutoTV'))        return {label:'PlutoTV',    color:'#0096c7'}
+  if (s.includes('Samsung'))        return {label:'Samsung',    color:'#1428a0'}
+  if (s.includes('GlobeTV México')) return {label:'GlobeTV MX', color:'#2d6a4f'}
+  if (s.includes('GlobeTV'))        return {label:'GlobeTV',    color:'#40916c'}
+  return {label: s.slice(0,10), color:'#666'}
+}
+
+let epgPreviewTimer = null
+async function loadEpgPreview(epgId, previewEl) {
+  clearTimeout(epgPreviewTimer)
+  epgPreviewTimer = setTimeout(async () => {
+    try {
+      previewEl.innerHTML = '<div style="color:var(--tx2);font-size:.72rem;padding:4px">Cargando programación...</div>'
+      previewEl.style.display = 'block'
+      const d = await api('GET', `/admin/epg/preview?id=${encodeURIComponent(epgId)}`)
+      if (!d.programs?.length) {
+        previewEl.innerHTML = '<div style="color:var(--tx2);font-size:.72rem;padding:4px">Sin programación disponible</div>'
+        return
+      }
+      previewEl.innerHTML = d.programs.map(p => `
+        <div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.72rem">
+          <span style="color:var(--tx2);white-space:nowrap;font-family:monospace">${p.start}</span>
+          <span style="flex:1;${p.isNow?'color:var(--gn);font-weight:700':''}">${p.title}${p.isNow?' <span style="background:var(--ac2);color:#fff;font-size:.6rem;padding:1px 5px;border-radius:3px">EN VIVO</span>':''}</span>
+        </div>
+      `).join('')
+    } catch(e) {
+      previewEl.style.display = 'none'
+    }
+  }, 400)
+}
+
+async function toggleEpgPreview(event, epgId, icon) {
+  // Si click en botón Seleccionar → asignar
+  if (event.target.closest('.epg-select-btn')) {
+    selectEpg(epgId, icon)
+    return
+  }
+  
+  const item = event.currentTarget
+  const preview = item.querySelector('.epg-prog-preview')
+  const isOpen = preview.style.display === 'block'
+  
+  // Cerrar otros previews abiertos
+  document.querySelectorAll('.epg-prog-preview').forEach(p => {
+    p.style.display = 'none'
+    p.innerHTML = ''
+  })
+  
+  if (isOpen) return // toggle off
+  
+  // Cargar preview
+  preview.innerHTML = '<div style="color:var(--tx2);font-size:.72rem;padding:4px 0">⏳ Cargando programación...</div>'
+  preview.style.display = 'block'
+  
+  try {
+    const d = await api('GET', `/admin/epg/preview?id=${encodeURIComponent(epgId)}`)
+    if (!d.programs?.length) {
+      preview.innerHTML = '<div style="color:var(--tx2);font-size:.72rem;padding:4px 0">Sin programación disponible en este momento</div>'
+      return
+    }
+    preview.innerHTML = 
+      '<div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">' +
+      '<span style="font-size:.7rem;color:var(--tx2)">Programación actual</span>' +
+      `<button class="btn btn-primary btn-xs epg-select-btn" onclick="selectEpg('${epgId.replace(/'/g,"\\'")}','')">✓ Seleccionar este ID</button></div>` +
+      d.programs.map(p => `
+        <div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.72rem">
+          <span style="color:var(--tx2);white-space:nowrap;font-family:monospace;min-width:50px">${p.start}</span>
+          <span style="flex:1;${p.isNow?'color:var(--gn);font-weight:700':'color:var(--tx)'}">${p.title}${p.isNow?' <span style="background:var(--ac2);color:#fff;font-size:.6rem;padding:1px 5px;border-radius:3px;margin-left:4px">EN VIVO</span>':''}</span>
+        </div>
+      `).join('')
+  } catch(e) {
+    preview.innerHTML = '<div style="color:var(--ac2);font-size:.72rem;padding:4px 0">Error cargando programación</div>'
+  }
+}
+
+function searchEpgPicker(q) {
+  clearTimeout(epgTimer)
+  if (!q || q.length < 2) { hideAllPickers(); return }
+  epgTimer = setTimeout(async () => {
+    try {
+      const results = await api('GET', `/admin/epg/search?q=${encodeURIComponent(q)}&limit=15`)
+      const box = document.getElementById('epg-results')
+      if (!results.length) { box.classList.remove('open'); return }
+      box.innerHTML = results.map(r => {
+        const src = srcLabel(r.source_name)
+        const epgIdSafe = r.epg_id.replace(/'/g, "\\'")
+        const iconSafe  = (r.icon||'').replace(/'/g, "\\'")
+        return `<div class="pick-item" 
+          onclick="toggleEpgPreview(event, '${epgIdSafe}', '${iconSafe}')">
+          ${r.icon ? `<img src="${r.icon}" class="pick-logo" onerror="this.style.display='none'" alt="">` : '<span style="font-size:1.1rem">📅</span>'}
+          <div style="flex:1;min-width:0">
+            <div class="pick-name">${r.name}</div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <span class="pick-sub">${r.epg_id}</span>
+              <span style="font-size:.62rem;font-weight:700;padding:1px 6px;border-radius:10px;background:${src.color}22;color:${src.color};border:1px solid ${src.color}44">
+                ${src.label}
+              </span>
+            </div>
+            <div class="epg-prog-preview" style="display:none;margin-top:6px;padding:6px 8px;background:var(--bg);border-radius:6px;border:1px solid var(--bd)"></div>
+          </div>
+          <span class="score-pill">${Math.round((r.score||0)*100)}%</span>
+        </div>`
+      }).join('')
+      box.classList.add('open')
+    } catch(e) {}
+  }, 250)
+}
+
+function selectEpg(id, icon) {
+  document.getElementById('f-epg').value = id
+  if (icon && !document.getElementById('f-logo').value) {
+    document.getElementById('f-logo').value = icon
+    updateLogoPreview(icon)
+  }
+  document.getElementById('epg-results').classList.remove('open')
+}
+
+// ═══ LOGO PICKER ═══
+let logoTimer = null
+function searchLogoPicker(q) {
+  clearTimeout(logoTimer)
+  updateLogoPreview(q.startsWith('http') ? q : '')
+  if (!q || q.length < 2 || q.startsWith('http')) { document.getElementById('logo-results').classList.remove('open'); return }
+  logoTimer = setTimeout(async () => {
+    try {
+      const results = await api('GET', `/admin/logos/search?q=${encodeURIComponent(q)}&limit=12`)
+      const box = document.getElementById('logo-results')
+      if (!results.length) { box.classList.remove('open'); return }
+      box.innerHTML = results.map(r=>`
+        <div class="pick-item" onclick="selectLogo('${r.url.replace(/'/g,"\\'")}','${r.name}')">
+          <img src="${r.url}" class="pick-logo" onerror="this.style.display='none'" alt="">
+          <div style="flex:1;min-width:0">
+            <div class="pick-name">${r.name}</div>
+            <span class="pick-src">${r.country}</span>
+          </div>
+          <span class="score-pill">${Math.round((r.score||0)*100)}%</span>
+        </div>
+      `).join('')
+      box.classList.add('open')
+    } catch(e) {}
+  }, 250)
+}
+
+function selectLogo(url, name) {
+  document.getElementById('f-logo').value = url
+  updateLogoPreview(url)
+  document.getElementById('logo-results').classList.remove('open')
+}
+
+function hideAllPickers() {
+  document.querySelectorAll('.picker-results').forEach(p=>p.classList.remove('open'))
+}
+document.addEventListener('click', e=>{ if(!e.target.closest('.picker-wrap')) hideAllPickers() })
+
+// ═══ FUENTES M3U ═══
+async function loadSources() {
+  const sources = await api('GET','/admin/sources/m3u').catch(()=>[])
+  const el = document.getElementById('sources-list')
+  if (!sources.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-ico">📡</div><div>Sin fuentes M3U</div><button class="btn btn-primary btn-sm" onclick="openModal('modal-add-source')">+ Agregar</button></div>`
+    return
+  }
+  el.innerHTML = sources.map(s=>`
+    <div class="card" style="display:flex;align-items:center;gap:12px">
+      <span class="status-dot ${dotClass(s.status)}"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600">${s.name}</div>
+        <div style="font-size:.75rem;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.url||'(manual)'}</div>
+        <div style="font-size:.72rem;color:var(--tx2);margin-top:2px">${s.channel_count} canales · ${s.last_fetched ? 'Actualizado: '+s.last_fetched.slice(0,16) : 'Nunca'}</div>
+        ${s.last_error?`<div style="font-size:.72rem;color:var(--ac2);margin-top:2px">${s.last_error}</div>`:''}
+      </div>
+      <div style="display:flex;gap:6px">
+        ${s.url?`<button class="btn btn-secondary btn-sm" onclick="refreshSource(${s.id})">⟳</button>`:''}
+        <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id},'${s.name}')">🗑</button>
+      </div>
+    </div>
+  `).join('')
+}
+
+async function addSource() {
+  const name = document.getElementById('src-name').value.trim()
+  const url  = document.getElementById('src-url').value.trim()
+  if (!name || !url) return alert('Nombre y URL son obligatorios')
+  try {
+    await api('POST','/admin/sources/m3u',{ name, url, default_cat_id: document.getElementById('src-cat').value||null, dedup_mode: document.getElementById('src-dedup').value })
+    closeModal('modal-add-source')
+    loadSources()
+    log(`Fuente M3U "${name}" agregada — importando...`, 'ok')
+    document.getElementById('src-name').value = ''
+    document.getElementById('src-url').value = ''
+  } catch(e) { alert('Error: '+e.message) }
+}
+
+async function importText() {
+  const text = document.getElementById('import-text').value.trim()
+  if (!text) return alert('Pega contenido M3U')
+  try {
+    const r = await api('POST','/admin/sources/m3u/import-text',{ text })
+    closeModal('modal-import-text')
+    loadChannels()
+    log(`Importados: +${r.added} nuevos, ~${r.updated} actualizados`, 'ok')
+    document.getElementById('import-text').value = ''
+  } catch(e) { alert('Error: '+e.message) }
+}
+
+async function refreshSource(id) {
+  await api('POST',`/admin/sources/m3u/${id}/refresh`)
+  log('Actualizando fuente M3U...', 'info')
+  setTimeout(loadSources, 2000)
+}
+
+async function deleteSource(id, name) {
+  if (!confirm(`¿Eliminar fuente "${name}"?`)) return
+  await api('DELETE',`/admin/sources/m3u/${id}`)
+  loadSources()
+  log(`Fuente ${name} eliminada`, 'warn')
+}
+
+// ═══ FUENTES EPG ═══
+const EPG_PRESETS = [
+  {name:'GlobeTV MX 1',url:'https://raw.githubusercontent.com/globetvapp/epg/main/Mexico/mexico1.xml',country:'MX'},
+  {name:'GlobeTV MX 2',url:'https://raw.githubusercontent.com/globetvapp/epg/main/Mexico/mexico2.xml',country:'MX'},
+  {name:'GlobeTV ES',url:'https://raw.githubusercontent.com/globetvapp/epg/main/Spain/spain1.xml',country:'ES'},
+  {name:'GlobeTV AR',url:'https://raw.githubusercontent.com/globetvapp/epg/main/Argentina/argentina1.xml',country:'AR'},
+  {name:'GlobeTV BR',url:'https://raw.githubusercontent.com/globetvapp/epg/main/Brazil/brazil1.xml',country:'BR'},
+  {name:'GlobeTV CO',url:'https://raw.githubusercontent.com/globetvapp/epg/main/Colombia/colombia1.xml',country:'CO'},
+  {name:'GlobeTV CL',url:'https://raw.githubusercontent.com/globetvapp/epg/main/Chile/chile1.xml',country:'CL'},
+  {name:'PlutoTV Global',url:'https://raw.githubusercontent.com/matthuisman/i.mjh.nz/master/PlutoTV/all.xml',country:'GLOBAL'},
+  {name:'Samsung TV+',url:'https://raw.githubusercontent.com/matthuisman/i.mjh.nz/master/SamsungTVPlus/all.xml',country:'GLOBAL'},
+]
+
+document.getElementById('epg-presets').innerHTML = EPG_PRESETS.map(p=>
+  `<button class="btn btn-secondary btn-xs" onclick="setEpgPreset('${p.name}','${p.url}','${p.country}')">${p.name}</button>`
+).join('')
+
+function setEpgPreset(name, url, country) {
+  document.getElementById('epg-name').value    = name
+  document.getElementById('epg-url').value     = url
+  document.getElementById('epg-country').value = country
+}
+
+async function loadEpgSources() {
+  const sources = await api('GET','/admin/sources/epg').catch(()=>[])
+  const el = document.getElementById('epg-list')
+  if (!sources.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-ico">📅</div><div>Sin fuentes EPG</div></div>`
+    return
+  }
+  el.innerHTML = sources.map(s=>`
+    <div class="card" style="display:flex;align-items:center;gap:12px">
+      <span class="status-dot ${dotClass(s.status)}"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600">${s.name} <span style="font-size:.72rem;color:var(--tx2)">${s.country||''}</span></div>
+        <div style="font-size:.72rem;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.url}</div>
+        <div style="font-size:.72rem;color:var(--tx2);margin-top:2px">${s.channel_count} IDs · ${s.last_fetched?'Actualizado: '+s.last_fetched.slice(0,16):'Nunca'}</div>
+        ${s.last_error?`<div style="font-size:.72rem;color:var(--ac2)">${s.last_error.slice(0,80)}</div>`:''}
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="refreshEpg(${s.id})">⟳</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteEpg(${s.id},'${s.name}')">🗑</button>
+      </div>
+    </div>
+  `).join('')
+}
+
+async function addEpgSource() {
+  const name    = document.getElementById('epg-name').value.trim()
+  const url     = document.getElementById('epg-url').value.trim()
+  const country = document.getElementById('epg-country').value.trim()
+  if (!name || !url) return alert('Nombre y URL son obligatorios')
+  try {
+    await api('POST','/admin/sources/epg',{ name, url, country })
+    closeModal('modal-add-epg')
+    loadEpgSources()
+    log(`EPG "${name}" agregado — descargando...`, 'ok')
+    document.getElementById('epg-name').value = ''
+    document.getElementById('epg-url').value = ''
+    document.getElementById('epg-country').value = ''
+  } catch(e) { alert('Error: '+e.message) }
+}
+
+async function refreshEpg(id) {
+  await api('POST',`/admin/sources/epg/${id}/refresh`)
+  log('Actualizando EPG...','info')
+  setTimeout(loadEpgSources, 2000)
+}
+
+async function deleteEpg(id, name) {
+  if (!confirm(`¿Eliminar EPG "${name}"?`)) return
+  await api('DELETE',`/admin/sources/epg/${id}`)
+  loadEpgSources()
+  log(`EPG ${name} eliminado`, 'warn')
+}
+
+// ═══ USUARIOS ═══
+async function loadUsers() {
+  const users = await api('GET','/admin/users').catch(()=>[])
+  const tbody = document.getElementById('users-tbody')
+  if (!users.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div>Sin usuarios</div></div></td></tr>`
+    return
+  }
+  tbody.innerHTML = users.map(u=>`<tr>
+    <td><div style="font-weight:600">${u.username}</div>
+        <div style="font-size:.7rem;font-family:monospace;color:var(--tx2)">${u.notes||''}</div></td>
+    <td><span style="font-size:.78rem">${u.plan}</span></td>
+    <td style="text-align:center">${u.max_streams}</td>
+    <td><span class="status-dot ${u.status==='active'?'s-ok':'s-err'}"></span>${u.status}</td>
+    <td><span style="font-size:.78rem;color:var(--tx2)">${u.expires_at||'—'}</span></td>
+    <td><div style="display:flex;gap:4px">
+      <button class="btn btn-secondary btn-xs" onclick="editUser(${u.id})">✏️</button>
+      <button class="btn btn-danger btn-xs" onclick="deleteUser(${u.id},'${u.username}')">🗑</button>
+    </div></td>
+  </tr>`).join('')
+}
+
+async function saveUser() {
+  const username = document.getElementById('u-username').value.trim()
+  const password = document.getElementById('u-password').value.trim()
+  if (!editingUserId && (!username || !password)) return alert('Usuario y contraseña requeridos')
+  const body = {
+    username, password,
+    plan:       document.getElementById('u-plan').value,
+    max_streams: parseInt(document.getElementById('u-streams').value),
+    status:     document.getElementById('u-status').value,
+    expires_at: document.getElementById('u-expires').value || null,
+    notes:      document.getElementById('u-notes').value,
+  }
+  try {
+    if (editingUserId) await api('PUT',`/admin/users/${editingUserId}`, body)
+    else { const r = await api('POST','/admin/users', body); log(`Usuario creado. Token: ${r.token}`, 'ok') }
+    closeModal('modal-add-user')
+    loadUsers()
+  } catch(e) { alert('Error: '+e.message) }
+}
+
+async function editUser(id) {
+  editingUserId = id
+  const users = await api('GET','/admin/users')
+  const u = users.find(x=>x.id===id)
+  if (!u) return
+  document.getElementById('modal-user-title').textContent = '✏️ Editar Usuario'
+  document.getElementById('u-username').value = u.username
+  document.getElementById('u-password').value = ''
+  document.getElementById('u-plan').value     = u.plan
+  document.getElementById('u-streams').value  = u.max_streams
+  document.getElementById('u-status').value   = u.status
+  document.getElementById('u-expires').value  = u.expires_at?.slice(0,10)||''
+  document.getElementById('u-notes').value    = u.notes||''
+  openModal('modal-add-user')
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`¿Eliminar usuario "${name}"?`)) return
+  await api('DELETE',`/admin/users/${id}`)
+  loadUsers()
+  log(`Usuario ${name} eliminado`, 'warn')
+}
+
+// ═══ REFRESH ALL ═══
+async function refreshAll() {
+  log('Iniciando actualización completa...', 'info')
+  await api('POST','/admin/sources/m3u/refresh-all').catch(e=>log(e.message,'err'))
+  await api('POST','/admin/sources/epg/refresh-all').catch(e=>log(e.message,'err'))
+  log('Actualización iniciada en background', 'ok')
+  setTimeout(loadDashboard, 3000)
+}
+
+// ═══ INIT ═══
+loadDashboard()
+</script>
+</body>
+</html>
