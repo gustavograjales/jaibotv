@@ -126,8 +126,8 @@ iptv-server/
 
 ### EPG y Logos
 
-- **EPG IDs indexados:** 13,288 (Fuse.js para búsqueda fuzzy)
-- **Fuentes EPG:** 26 activas (todas con status `ok`)
+- **EPG IDs indexados:** ~9,261 (Fuse.js para búsqueda fuzzy)
+- **Fuentes EPG:** 25 activas (todas con status `ok`) — Free EPG Ru desactivada por OOM
 - **Logos indexados:** 3,848 (cache en `data/logo-index.json` desde tv-logo/tv-logos GitHub)
 - **Fuentes M3U activas:** 2 (iptv-org México, jromero88)
 
@@ -260,6 +260,14 @@ Cada `git push` pide usuario y PAT. Migrar a SSH o configurar credential helper.
 
 `data/iptv.db` está en `.gitignore` por seguridad pero no hay rotación local. Agregar cron diario que copie a `~/backups/db/` con rotación.
 
+### 9. OOM con XMLTVs grandes (mitigado)
+
+`fast-xml-parser` materializa todo el árbol XML en memoria. Con `max_memory_restart: 600M` de PM2, archivos >50 MB pueden tumbar el proceso silenciosamente (PM2 lo reinicia y la fuente queda en `status='loading'` eternamente). **Detectado el 2026-05-05** con `Free EPG Ru` (89 MB, 3,823 canales) → fuente desactivada. Pendiente: implementar stream parser (sax) para fuentes grandes o validar tamaño antes de parsear.
+
+### 10. Refresh EPG secuencial sin aislamiento de errores
+
+`refreshAllEpgSources()` usa `for...await` secuencial. Si una fuente falla con error no capturable (OOM, timeout largo), las siguientes se skipean sin log claro. Pendiente: migrar a `Promise.allSettled` con concurrencia limitada (p.ej. 3 simultáneas).
+
 ## Roadmap
 
 ### 🔴 Inmediato (próximas 1-2 sesiones)
@@ -272,6 +280,11 @@ Cada `git push` pide usuario y PAT. Migrar a SSH o configurar credential helper.
 
 - ~~**Monitor de IP pública**~~ — ✅ Completado 2026-05-05 (cron 10 min, bug #1 mitigado)
 - ~~**Aumentar heap de Node**~~ — ✅ Completado 2026-05-05 (512MB)
+- ~~**Fix cron EPG**~~ — ✅ Completado 2026-05-05 (`'0 4 */7 * *'` → `'0 4 * * *'` diario)
+- **Auto-match de canales sin `epg_id`** — 24 canales pendientes, usar `autoMatchEpgId()` existente en `epgEngine.js`
+- **Hardening de `refreshAllEpgSources`** — `Promise.allSettled` con concurrencia limitada (bug #10)
+- **Stream parser para XMLTVs grandes** — sax/saxes en lugar de fast-xml-parser para fuentes >50MB (bug #9)
+- **Fix cron M3U** — `'0 3 */7 * *'` tiene mismo bug semántico, dejado intencional porque M3U se actualiza manualmente
 - **Auth SSH para git** — eliminar fricción de PAT
 
 ### Fase 5 ⏳ — Acceso remoto seguro
@@ -333,4 +346,4 @@ cp ~/iptv-server/data/iptv.db ~/backups/db/iptv_$(date +%Y%m%d_%H%M%S).db
 
 Cuando termine una fase importante o agregue features grandes, recuérdame **actualizar este CLAUDE.md** con el nuevo estado y hacer commit. Es la fuente de verdad del proyecto.
 
-Última auditoría completa: **2026-05-05** (cache M3U + monitor IP + heap 512MB)
+Última auditoría completa: **2026-05-05** (cache M3U + monitor IP + heap 512MB + EPG refresh + cron fix + OOM mitigado)
