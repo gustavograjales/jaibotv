@@ -2,32 +2,46 @@ import cron from 'node-cron'
 import { refreshAllM3USources } from './aggregator.js'
 import { refreshAllEpgSources } from './epgEngine.js'
 import config from '../../config.js'
+import { scrapeAllTvtvChannels } from './tvtvScraper.js'
+import { scrapeAllTvporiChannels } from './tvporiScraper.js'
+import { invalidateAll as invalidateM3UCache } from './m3uCache.js'
+import { checkPublicIp } from './ipMonitor.js'
 
 export function startScheduler() {
   if (!config.scheduler.enabled) return
+
   cron.schedule(config.scheduler.m3uCron, async () => {
-    console.log('⏰ Actualizando fuentes M3U...')
+    console.log('[cron] Actualizando fuentes M3U...')
     await refreshAllM3USources()
+    invalidateM3UCache('cron m3u refresh')
   }, { timezone: 'America/Mexico_City' })
+
   cron.schedule(config.scheduler.epgCron, async () => {
-    console.log('⏰ Actualizando fuentes EPG...')
+    console.log('[cron] Actualizando fuentes EPG...')
     await refreshAllEpgSources()
   }, { timezone: 'America/Mexico_City' })
-  console.log('⏰ Scheduler iniciado')
-}
 
-// Importar scraper
-import { scrapeAllTvtvChannels } from './tvtvScraper.js'
-import { scrapeAllTvporiChannels } from './tvporiScraper.js'
+  // Check inicial de IP al arrancar (no esperar 10 min)
+  checkPublicIp().catch(err => console.error('[IPMonitor inicial]', err.message))
+
+  console.log('[scheduler] iniciado')
+}
 
 // Renovar URLs tvtvhd cada 4 horas
 cron.schedule('0 */4 * * *', async () => {
-  console.log('⏰ Renovando URLs tvtvhd...')
+  console.log('[cron] Renovando URLs tvtvhd...')
   await scrapeAllTvtvChannels()
+  invalidateM3UCache('cron tvtv scrape')
 }, { timezone: 'America/Mexico_City' })
 
 // Renovar URLs tvporinternet2 cada 3.5 horas (tokens duran ~4h)
 cron.schedule('30 */3 * * *', async () => {
-  console.log('⏰ Renovando URLs tvporinternet2...')
+  console.log('[cron] Renovando URLs tvporinternet2...')
   await scrapeAllTvporiChannels()
+  invalidateM3UCache('cron tvpori scrape')
+}, { timezone: 'America/Mexico_City' })
+
+// Monitor de IP publica cada 10 minutos
+cron.schedule('*/10 * * * *', async () => {
+  await checkPublicIp()
 }, { timezone: 'America/Mexico_City' })

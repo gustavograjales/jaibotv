@@ -6,6 +6,8 @@ import { getDb } from '../db/schema.js'
 import { fetchM3USource, refreshAllM3USources, parseM3U, importChannels } from '../core/aggregator.js'
 import { fetchEpgSource, refreshAllEpgSources, searchEpgIds, autoMatchEpgId, rebuildFuseIndex } from '../core/epgEngine.js'
 import { randomBytes } from 'crypto'
+import { invalidateAll as invalidateM3UCache, cacheStats } from '../core/m3uCache.js'
+import { getIpStatus } from '../core/ipMonitor.js'
 
 export default async function adminRoutes(fastify) {
 
@@ -36,6 +38,18 @@ export default async function adminRoutes(fastify) {
     }
   })
 
+  // ── M3U CACHE ─────────────────────────────────────────────────────────────
+  fastify.get('/admin/m3u-cache/stats', async () => cacheStats())
+
+  fastify.post('/admin/m3u-cache/invalidate', async () => {
+    invalidateM3UCache('manual via API')
+    return { ok: true }
+  })
+
+  // ── SYSTEM STATE ──────────────────────────────────────────────────────────
+  fastify.get('/admin/system/ip-status', async () => getIpStatus())
+
+
   // ── CANALES ───────────────────────────────────────────────────────────────
   fastify.get('/admin/channels', async (req) => {
     const db = getDb()
@@ -65,7 +79,7 @@ export default async function adminRoutes(fastify) {
     if (db.prepare(`SELECT id FROM channels WHERE LOWER(name)=LOWER(?)`).get(name)) return reply.code(409).send({ error:'Canal duplicado' })
     const streamId = (db.prepare(`SELECT COALESCE(MAX(stream_id),1000) as m FROM channels`).get()?.m||1000)+1
     const r = db.prepare(`INSERT INTO channels (name,category_id,country,logo,epg_id,url_fhd,url_hd,url_sd,stream_id) VALUES (?,?,?,?,?,?,?,?,?)`).run(name,category_id||null,country||'',logo||'',epg_id||'',url_fhd||'',url_hd||'',url_sd||'',streamId)
-    return reply.code(201).send({ id:r.lastInsertRowid, stream_id:streamId })
+    invalidateM3UCache('channel created'); return reply.code(201).send({ id:r.lastInsertRowid, stream_id:streamId })
   })
 
   fastify.put('/admin/channels/:id', async (req, reply) => {
@@ -73,12 +87,12 @@ export default async function adminRoutes(fastify) {
     const { name,category_id,country,logo,epg_id,url_fhd,url_hd,url_sd,enabled,sort_order } = req.body||{}
     if (!db.prepare(`SELECT id FROM channels WHERE id=?`).get(req.params.id)) return reply.code(404).send({ error:'No encontrado' })
     db.prepare(`UPDATE channels SET name=COALESCE(?,name),category_id=COALESCE(?,category_id),country=COALESCE(?,country),logo=COALESCE(?,logo),epg_id=COALESCE(?,epg_id),url_fhd=COALESCE(?,url_fhd),url_hd=COALESCE(?,url_hd),url_sd=COALESCE(?,url_sd),enabled=COALESCE(?,enabled),sort_order=COALESCE(?,sort_order),updated_at=datetime('now') WHERE id=?`).run(name,category_id,country,logo,epg_id,url_fhd,url_hd,url_sd,enabled,sort_order,req.params.id)
-    return { ok:true }
+    invalidateM3UCache('channel updated'); return { ok:true }
   })
 
   fastify.delete('/admin/channels/:id', async (req) => {
     getDb().prepare(`DELETE FROM channels WHERE id=?`).run(req.params.id)
-    return { ok:true }
+    invalidateM3UCache('channel deleted'); return { ok:true }
   })
 
   // ── EPG SEARCH ────────────────────────────────────────────────────────────
@@ -121,7 +135,7 @@ export default async function adminRoutes(fastify) {
         matched++
       }
     }
-    return { total:channels.length, matched }
+    invalidateM3UCache('bulk auto-epg'); return { total:channels.length, matched }
   })
 
   // ── FUENTES M3U ───────────────────────────────────────────────────────────
@@ -136,7 +150,7 @@ export default async function adminRoutes(fastify) {
     if (!url&&!content) return reply.code(400).send({ error:'url o content requerido' })
     const r = db.prepare(`INSERT INTO m3u_sources (name,url,content,default_cat_id,dedup_mode) VALUES (?,?,?,?,?)`).run(name,url||'',content||'',default_cat_id||null,dedup_mode||'name')
     const src = db.prepare(`SELECT * FROM m3u_sources WHERE id=?`).get(r.lastInsertRowid)
-    fetchM3USource(src).catch(console.error)
+    fetchM3USource(src).then(() => invalidateM3UCache('m3u source refreshed')).catch(console.error)
     return reply.code(201).send({ id:r.lastInsertRowid, status:'importing' })
   })
 
@@ -148,18 +162,18 @@ export default async function adminRoutes(fastify) {
   fastify.post('/admin/sources/m3u/:id/refresh', async (req, reply) => {
     const src = getDb().prepare(`SELECT * FROM m3u_sources WHERE id=?`).get(req.params.id)
     if (!src) return reply.code(404).send({ error:'No encontrada' })
-    fetchM3USource(src).catch(console.error)
+    fetchM3USource(src).then(() => invalidateM3UCache('m3u source refreshed')).catch(console.error)
     return { status:'refreshing' }
   })
 
   fastify.post('/admin/sources/m3u/import-text', async (req, reply) => {
     const { text, default_cat_id, dedup_mode } = req.body||{}
     if (!text) return reply.code(400).send({ error:'text requerido' })
-    return importChannels(parseM3U(text, default_cat_id||null, null), dedup_mode||'name')
+    const result = importChannels(parseM3U(text, default_cat_id||null, null), dedup_mode||'name'); invalidateM3UCache('m3u import-text'); return result
   })
 
   fastify.post('/admin/sources/m3u/refresh-all', async () => {
-    refreshAllM3USources().catch(console.error)
+    refreshAllM3USources().then(() => invalidateM3UCache('m3u refresh-all')).catch(console.error)
     return { status:'refreshing_all' }
   })
 
@@ -208,20 +222,20 @@ export default async function adminRoutes(fastify) {
     const { name, icon, sort_order } = req.body||{}
     if (!name) return reply.code(400).send({ error:'name requerido' })
     const r = getDb().prepare(`INSERT OR IGNORE INTO categories (name,icon,sort_order) VALUES (?,?,?)`).run(name,icon||'📺',sort_order||0)
-    return reply.code(201).send({ id:r.lastInsertRowid })
+    invalidateM3UCache('category created'); return reply.code(201).send({ id:r.lastInsertRowid })
   })
 
   fastify.put('/admin/categories/:id', async (req) => {
     const { name, icon, sort_order } = req.body||{}
     getDb().prepare(`UPDATE categories SET name=COALESCE(?,name),icon=COALESCE(?,icon),sort_order=COALESCE(?,sort_order) WHERE id=?`).run(name,icon,sort_order,req.params.id)
-    return { ok:true }
+    invalidateM3UCache('category updated'); return { ok:true }
   })
 
   fastify.delete('/admin/categories/:id', async (req) => {
     const db = getDb()
     db.prepare(`UPDATE channels SET category_id=NULL WHERE category_id=?`).run(req.params.id)
     db.prepare(`DELETE FROM categories WHERE id=?`).run(req.params.id)
-    return { ok:true }
+    invalidateM3UCache('category deleted'); return { ok:true }
   })
 
   // ── USUARIOS ──────────────────────────────────────────────────────────────
@@ -297,7 +311,7 @@ export default async function adminRoutes(fastify) {
         matched++
       }
     }
-    return { total: channels.length, matched }
+    invalidateM3UCache('bulk auto-logo'); return { total: channels.length, matched }
   })
 
   // ── STREAM CHECKER ────────────────────────────────────────────────────────
@@ -317,7 +331,7 @@ export default async function adminRoutes(fastify) {
     }).then(results => {
       const ok = results.filter(r=>r.ok).length
       console.log(`✅ Check completado: ${ok}/${results.length} streams activos`)
-    }).catch(console.error)
+    }).then(() => invalidateM3UCache('streams checked')).catch(console.error)
     return { status: 'checking', total: streamStats().total }
   })
 
@@ -359,7 +373,7 @@ export default async function adminRoutes(fastify) {
       if (p.checked % 5 === 0) {
         console.log(`🔍 Scraping ${p.checked}/${p.total} — ${p.channel} ${p.ok?'✅':'❌'}`)
       }
-    }).catch(console.error)
+    }).then(() => invalidateM3UCache('tvtv scrape')).catch(console.error)
     return { status: 'scraping' }
   })
 
@@ -424,7 +438,7 @@ export default async function adminRoutes(fastify) {
     scrapeAllTvporiChannels((p) => {
       if (p.checked % 10 === 0)
         console.log(`🔍 tvpori ${p.checked}/${p.total} — ${p.channel} ${p.ok ? '✅' : '❌'}`)
-    }).catch(console.error)
+    }).then(() => invalidateM3UCache('tvpori scrape')).catch(console.error)
     return { status: 'scraping', total: TVPORI_CHANNELS.length }
   })
 
@@ -433,7 +447,7 @@ export default async function adminRoutes(fastify) {
     if (!name) return reply.code(400).send({ error: 'name requerido' })
     const result = await scrapeTvporiByName(name)
     if (!result.ok) return reply.code(404).send(result)
-    return result
+    invalidateM3UCache('tvpori scrape-one'); return result
   })
 
   fastify.get('/admin/tvpori/channels', async () => {

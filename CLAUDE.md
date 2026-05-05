@@ -6,7 +6,7 @@ JaiboTV es un servidor IPTV personal que expone una API compatible con Xtream Co
 
 ## Quién soy
 
-Soy Gustavo Ajales (gustavograjales en GitHub). Trabajo en este proyecto como desarrollo personal. Accedo al servidor vía SSH desde Windows 11.
+Soy Gustavo Grajales (gustavograjales en GitHub). Trabajo en este proyecto como desarrollo personal. Accedo al servidor vía SSH desde Windows 11.
 
 ## Cómo quiero que me respondas
 
@@ -53,10 +53,16 @@ ipv4.method manual
 - **Otros:** Docker, ffmpeg, UFW firewall
 - **Puertos abiertos en UFW:** 22, 80, 443, 3000 (TCP, IPv4 e IPv6)
 
+## Archivos de configuración
+
+- `ecosystem.config.cjs` — Config PM2 (heap 512MB vía NODE_OPTIONS, max_memory_restart 600M)
+
 ## Estructura del proyecto
 iptv-server/
 ├── config.js              # Config general (SERVER_IP centralizado)
+├── ecosystem.config.cjs   # Config PM2 (heap 512MB, max_memory_restart 600M)
 ├── package.json
+├── package-lock.json
 ├── CLAUDE.md              # Este archivo (fuente de verdad)
 ├── data/                  # SQLite + caches (ignorado por git)
 │   ├── iptv.db
@@ -65,23 +71,26 @@ iptv-server/
 │   └── logo-index.json    # Cache del índice de logos (3,848 entradas)
 ├── media/                 # VOD content (ignorado por git, sin uso aún)
 └── src/
-├── server.js          # Entry point
-├── admin-ui/
-│   └── index.html     # Panel admin web (SPA monolítico)
-├── api/
-│   ├── admin.js       # REST API admin
-│   └── xtream.js      # Xtream Codes API
-├── core/
-│   ├── aggregator.js     # M3U parser + importer
-│   ├── epgEngine.js      # EPG parser + Fuse.js search
-│   ├── logoEngine.js     # Logos desde tv-logo/tv-logos GitHub
-│   ├── scheduler.js      # Cron jobs
-│   ├── streamChecker.js  # Verifica streams (HEAD/GET request)
-│   └── tvtvScraper.js    # Scraper tvtvhd.com (tokens cada 4h)
-└── db/
-├── schema.js
-└── seed.js
-
+    ├── server.js          # Entry point
+    ├── admin-ui/
+    │   └── index.html     # Panel admin web (SPA monolítico)
+    ├── api/
+    │   ├── admin.js       # REST API admin
+    │   └── xtream.js      # Xtream Codes API
+    ├── core/
+    │   ├── aggregator.js     # M3U parser + importer
+    │   ├── epgEngine.js      # EPG parser + Fuse.js search
+    │   ├── ipMonitor.js      # Monitor IP pública + auto re-scrape tvtv
+    │   ├── logoEngine.js     # Logos desde tv-logo/tv-logos GitHub
+    │   ├── m3uCache.js       # Cache en memoria del M3U (TTL 60s)
+    │   ├── scheduler.js      # Cron jobs
+    │   ├── streamChecker.js  # Verifica streams (HEAD/GET request)
+    │   ├── systemState.js    # Helpers para tabla system_state (key-value)
+    │   ├── tvporiScraper.js  # Scraper tvporinternet2.com (tokens cada 3.5h)
+    │   └── tvtvScraper.js    # Scraper tvtvhd.com (tokens cada 4h)
+    └── db/
+        ├── schema.js
+        └── seed.js
 ## Endpoints principales
 
 - **Admin Panel:** http://192.168.1.250:3000/admin/
@@ -187,7 +196,11 @@ iptv-server/
 
 **Detectado el 2026-05-04** después de un reset del módem que cambió la IP pública de `187.189.163.84` a `189.175.131.95`. Resultado: 12 de 13 canales premium quedaron rotos hasta correr `POST /admin/tvtv/scrape` manualmente.
 
-**Mitigación actual:** ninguna automatizada — hay que correr scrape manual cuando se detecta el problema.
+**Mitigación actual (2026-05-05):** monitor automático cada 10 min en `src/core/ipMonitor.js`.
+Detecta cambio de IP pública usando cadena de fallback (api.ipify.org → ifconfig.me → icanhazip.com),
+guarda historial en tabla `system_state`, y dispara `scrapeAllTvtvChannels()` automáticamente +
+invalida cache M3U. Status en `GET /admin/system/ip-status`. Sigue siendo prioridad media porque
+hay ventana de hasta 10 min entre el cambio de IP y la detección.
 
 **Soluciones propuestas (a implementar en algún punto):**
 
@@ -218,13 +231,16 @@ c) **Reducir cadencia del scrape de 4h → 1h**
 
 **Pendiente:** decidir si reconstruir el feature de failover (importar URLs alternativas reales y verificarlas periódicamente) o eliminarlo del schema.
 
-### 3. Endpoint `/get.php` lento (~8 segundos)
+### 3. Endpoint `/get.php` lento (~8 segundos) — RESUELTO 2026-05-05
 
-Regenera el M3U entero leyendo de DB en cada request. Cachear en memoria con TTL de N segundos.
+Implementado cache en memoria (`src/core/m3uCache.js`) con TTL=60s e invalidación
+explícita en eventos. Key compuesta `{catId}:{qualities}:{epgUrl}`. Stats en
+`GET /admin/m3u-cache/stats`. Invalidación manual en `POST /admin/m3u-cache/invalidate`.
 
-### 4. Heap del proceso al 92-94%
+### 4. Heap del proceso al 92-94% — RESUELTO 2026-05-05
 
-Node corre con heap default (~32MB). Aumentar con `--max-old-space-size=512` en config de PM2.
+Heap subido a 512MB vía `NODE_OPTIONS=--max-old-space-size=512` en
+`ecosystem.config.cjs`. PM2 corre con `max_memory_restart: '600M'`.
 
 ### 5. M3U entrega URLs directas, no proxy
 
@@ -250,12 +266,12 @@ Cada `git push` pide usuario y PAT. Migrar a SSH o configurar credential helper.
 
 - ~~**Scraper tvporinternet2.com**~~ — ✅ Completado (69 canales activos, renovación 3.5h)
 - **Análisis de sitio nuevo** — capturar URLs de streams (sitio pendiente de compartir)
-- **Cachear M3U en memoria** — reducir 8s → <100ms el `/get.php`
+- ~~**Cachear M3U en memoria**~~ — ✅ Completado 2026-05-05 (TTL=60s + invalidación en eventos)
 
 ### 🟡 Corto plazo
 
-- **Monitor de IP pública** — bug conocido #1 (mitigar pre-VPS)
-- **Aumentar heap de Node** — eliminar warnings de heap usage
+- ~~**Monitor de IP pública**~~ — ✅ Completado 2026-05-05 (cron 10 min, bug #1 mitigado)
+- ~~**Aumentar heap de Node**~~ — ✅ Completado 2026-05-05 (512MB)
 - **Auth SSH para git** — eliminar fricción de PAT
 
 ### Fase 5 ⏳ — Acceso remoto seguro
@@ -317,4 +333,4 @@ cp ~/iptv-server/data/iptv.db ~/backups/db/iptv_$(date +%Y%m%d_%H%M%S).db
 
 Cuando termine una fase importante o agregue features grandes, recuérdame **actualizar este CLAUDE.md** con el nuevo estado y hacer commit. Es la fuente de verdad del proyecto.
 
-Última auditoría completa: **2026-05-04** (validación servidor vs GitHub vs DB)
+Última auditoría completa: **2026-05-05** (cache M3U + monitor IP + heap 512MB)

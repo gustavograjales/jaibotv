@@ -2,6 +2,7 @@ import { getDb } from '../db/schema.js'
 import config from '../../config.js'
 import { generateConsolidatedEPG } from '../core/epgEngine.js'
 import { generateM3U } from '../core/aggregator.js'
+import { getCached, setCached } from '../core/m3uCache.js'
 
 function authUser(username, password) {
   return getDb().prepare(`SELECT * FROM users WHERE username=? AND password=? AND status='active'`).get(username, password)
@@ -112,8 +113,16 @@ export default async function xtreamRoutes(fastify) {
     const user = authUser(username, password)
     if (!user) return reply.code(403).send('Unauthorized')
     if (type==='m3u'||type==='m3u_plus') {
-    const epgUrl = `${req.protocol||"http"}://${(req.headers["x-forwarded-host"]||req.hostname||config.SERVER_IP).split(":")[0]}:${req.server?.port||3000}/xmltv.php?username=${username}&password=${password}`
-      const m3u = generateM3U({ epgUrl, catId: category_id||null })
+      const epgUrl = `${req.protocol||"http"}://${(req.headers["x-forwarded-host"]||req.hostname||config.SERVER_IP).split(":")[0]}:${req.server?.port||3000}/xmltv.php?username=${username}&password=${password}`
+      const cacheOpts = { catId: category_id||null, qualities: ['fhd','hd','sd'], epgUrl }
+      let m3u = getCached(cacheOpts)
+      let cacheStatus = 'HIT'
+      if (!m3u) {
+        cacheStatus = 'MISS'
+        m3u = generateM3U({ epgUrl, catId: category_id||null })
+        setCached(cacheOpts, m3u)
+      }
+      reply.header('X-Cache', cacheStatus)
       reply.header('Content-Type','application/x-mpegurl; charset=utf-8')
       reply.header('Content-Disposition','attachment; filename="playlist.m3u"')
       return reply.send(m3u)
