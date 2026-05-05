@@ -1,3 +1,4 @@
+import { scrapeAllTvporiChannels, scrapeTvporiByName, TVPORI_CHANNELS } from '../core/tvporiScraper.js'
 import { importTvtvCsv, scrapeAllTvtvChannels } from '../core/tvtvScraper.js'
 import { checkAllStreams, checkChannelById, streamStats } from '../core/streamChecker.js'
 import { buildLogoIndex, searchLogos, autoMatchLogo, logoStats } from '../core/logoEngine.js'
@@ -416,10 +417,44 @@ export default async function adminRoutes(fastify) {
       return { programs: [], error: e.message }
     }
   })
+
+  // ── TVPORINTERNET2 SCRAPER ────────────────────────────────────────────────
+
+  fastify.post('/admin/tvpori/scrape', async () => {
+    scrapeAllTvporiChannels((p) => {
+      if (p.checked % 10 === 0)
+        console.log(`🔍 tvpori ${p.checked}/${p.total} — ${p.channel} ${p.ok ? '✅' : '❌'}`)
+    }).catch(console.error)
+    return { status: 'scraping', total: TVPORI_CHANNELS.length }
+  })
+
+  fastify.post('/admin/tvpori/scrape-one', async (req, reply) => {
+    const { name } = req.body || {}
+    if (!name) return reply.code(400).send({ error: 'name requerido' })
+    const result = await scrapeTvporiByName(name)
+    if (!result.ok) return reply.code(404).send(result)
+    return result
+  })
+
+  fastify.get('/admin/tvpori/channels', async () => {
+    const db = getDb()
+    return TVPORI_CHANNELS.map(ch => {
+      const dbCh = db.prepare(
+        `SELECT id, url_hd, tvpori_scraped_at FROM channels WHERE LOWER(name)=LOWER(?)`
+      ).get(ch.db_name)
+      return {
+        name:       ch.db_name,
+        host:       ch.scrape_host,
+        stream_id:  ch.stream_id,
+        in_db:      !!dbCh,
+        has_url:    !!(dbCh?.url_hd),
+        scraped_at: dbCh?.tvpori_scraped_at || null,
+      }
+    })
+  })
 }
 
 function parseXMLTVDate(str) {
-  // Formato: 20260430190000 +0000
   const s = str.replace(/\s.*/, '')
   return new Date(
     parseInt(s.slice(0,4)),

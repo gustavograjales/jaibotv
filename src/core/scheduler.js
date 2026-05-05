@@ -18,9 +18,16 @@ export function startScheduler() {
 
 // Importar scraper
 import { scrapeAllTvtvChannels } from './tvtvScraper.js'
+import { scrapeAllTvporiChannels } from './tvporiScraper.js'
 
 // Renovar URLs tvtvhd cada 4 horas
 cron.schedule('0 */4 * * *', async () => {
   console.log('⏰ Renovando URLs tvtvhd...')
   await scrapeAllTvtvChannels()
+}, { timezone: 'America/Mexico_City' })
+
+// Renovar URLs tvporinternet2 cada 3.5 horas (tokens duran ~4h)
+cron.schedule('30 */3 * * *', async () => {
+  console.log('⏰ Renovando URLs tvporinternet2...')
+  await scrapeAllTvporiChannels()
 }, { timezone: 'America/Mexico_City' })

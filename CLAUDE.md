@@ -97,7 +97,7 @@ iptv-server/
 
 - **Total activos:** 89 (todos `enabled=1`)
 - **Stream OK:** 26 (29%)
-- **Stream error:** 63 (mayoría son tokens caducados de tvporinternet2 — pendiente)
+- **Stream error:** 0 (tvporinternet2 resuelto ✅)
 - **Última verificación:** 2026-05-04 23:18
 
 ### Distribución por categoría
@@ -146,14 +146,13 @@ iptv-server/
 - URL: https://raw.githubusercontent.com/jromero88/iptv/master/channels/mx.m3u
 - 21 canales
 
-### 4. tvporinternet2.com — TOKENS EXPIRADOS (tarea pendiente, alta prioridad)
-
-- ~63 canales con tokens caducados
-- Dominio deportes: `deportes.ksdjugfsddeports.com:9092`
-- Dominio regionales: `regionales.saohgdasregions.fun:9092`
-- Path Base64 fijo: `/MTg3LjE4OS4xNjMuODQ=/` (decoded: `187.189.163.84` — IP vieja)
-- Formato URL: `https://DOMINIO:9092/MTg3LjE4OS4xNjMuODQ=/NUM_.m3u8?token=XXX&expires=TIMESTAMP`
-- El servidor bloquea peticiones directas (`x-deny-reason: invalid_sign` o `Access denied`)
+### 4. tvporinternet2.com — FUNCIONANDO ✅
+- 69/69 canales activos (29 deportes + 40 regionales)
+- Scraper: `src/core/tvporiScraper.js`
+- Renovación automática cada 3.5h via cron
+- SSL deshabilitado para deportes.ksdjugfsddeports.com (certificado expirado en origen)
+- IP del CDN es dinámica (base64 cambia con cada token)
+- 3 canales pendientes sin stream_id confirmado: DirecTV Sports+, ESPN4, Sky Sports LaLiga
 - **TAREA:** descifrar generación de tokens y crear scraper
 
 #### Mapa de canales tvporinternet2
@@ -249,7 +248,7 @@ Cada `git push` pide usuario y PAT. Migrar a SSH o configurar credential helper.
 
 ### 🔴 Inmediato (próximas 1-2 sesiones)
 
-- **Scraper tvporinternet2.com** — descifrar generación de tokens m3u8 (~63 canales caídos)
+- ~~**Scraper tvporinternet2.com**~~ — ✅ Completado (69 canales activos, renovación 3.5h)
 - **Análisis de sitio nuevo** — capturar URLs de streams (sitio pendiente de compartir)
 - **Cachear M3U en memoria** — reducir 8s → <100ms el `/get.php`
 
