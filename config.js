@@ -13,7 +13,7 @@ export default {
   },
   scheduler: {
     m3uCron:  '0 3 */7 * *',
-    epgCron:  '0 4 */7 * *',
+    epgCron:  '0 4 * * *',
     enabled: true,
   },
   cache: {

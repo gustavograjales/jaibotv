@@ -128,6 +128,7 @@ iptv-server/
 
 - **EPG IDs indexados:** ~9,261 (Fuse.js para búsqueda fuzzy)
 - **Fuentes EPG:** 25 activas (todas con status `ok`) — Free EPG Ru desactivada por OOM
+- **Priorización de fuentes EPG:** columna `priority` en `epg_sources` (default 50, menor = mayor prioridad). Resuelve conflictos cuando varias fuentes publican el mismo `epg_id` con programación distinta. Ej: `OPEN EPG Esp2` (id 34) configurada con `priority=10` por ser más confiable que `OPEN EPG Esp` (id 32, priority 50)
 - **Logos indexados:** 3,848 (cache en `data/logo-index.json` desde tv-logo/tv-logos GitHub)
 - **Fuentes M3U activas:** 2 (iptv-org México, jromero88)
 
@@ -268,6 +269,10 @@ Cada `git push` pide usuario y PAT. Migrar a SSH o configurar credential helper.
 
 `refreshAllEpgSources()` usa `for...await` secuencial. Si una fuente falla con error no capturable (OOM, timeout largo), las siguientes se skipean sin log claro. Pendiente: migrar a `Promise.allSettled` con concurrencia limitada (p.ej. 3 simultáneas).
 
+### 11. Regex de XMLTV sensible al orden de atributos (resuelto)
+
+El parser de `<programme>` en `generateConsolidatedEPG()` asumía que `channel` y `start` venían en orden fijo. PlutoTV/Samsung publican `<programme channel="..." start="...">`, pero OPEN EPG España publica `<programme start="..." stop="..." channel="...">`. Solo capturaba ~7 canales de 71. **Detectado y corregido el 2026-05-05** — regex ahora extrae atributos por separado tras matchear el bloque entero. Lección: nunca asumir orden de atributos en XML.
+
 ## Roadmap
 
 ### 🔴 Inmediato (próximas 1-2 sesiones)
@@ -281,6 +286,7 @@ Cada `git push` pide usuario y PAT. Migrar a SSH o configurar credential helper.
 - ~~**Monitor de IP pública**~~ — ✅ Completado 2026-05-05 (cron 10 min, bug #1 mitigado)
 - ~~**Aumentar heap de Node**~~ — ✅ Completado 2026-05-05 (512MB)
 - ~~**Fix cron EPG**~~ — ✅ Completado 2026-05-05 (`'0 4 */7 * *'` → `'0 4 * * *'` diario)
+- ~~**Priorización de fuentes EPG**~~ — ✅ Completado 2026-05-05 (columna `priority`, dedup en XMLTV consolidado, preview prioriza correctamente)
 - **Auto-match de canales sin `epg_id`** — 24 canales pendientes, usar `autoMatchEpgId()` existente en `epgEngine.js`
 - **Hardening de `refreshAllEpgSources`** — `Promise.allSettled` con concurrencia limitada (bug #10)
 - **Stream parser para XMLTVs grandes** — sax/saxes en lugar de fast-xml-parser para fuentes >50MB (bug #9)
@@ -346,4 +352,4 @@ cp ~/iptv-server/data/iptv.db ~/backups/db/iptv_$(date +%Y%m%d_%H%M%S).db
 
 Cuando termine una fase importante o agregue features grandes, recuérdame **actualizar este CLAUDE.md** con el nuevo estado y hacer commit. Es la fuente de verdad del proyecto.
 
-Última auditoría completa: **2026-05-05** (cache M3U + monitor IP + heap 512MB + EPG refresh + cron fix + OOM mitigado)
+Última auditoría completa: **2026-05-05** (cache M3U + monitor IP + heap 512MB + EPG refresh + cron fix + OOM mitigado + priorización de fuentes EPG)
