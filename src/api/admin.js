@@ -193,6 +193,13 @@ export default async function adminRoutes(fastify) {
     return reply.code(201).send({ id:r.lastInsertRowid, status:'downloading' })
   })
 
+  fastify.put('/admin/sources/epg/:id', async (req, reply) => {
+    const { priority, enabled } = req.body || {}
+    const db = getDb()
+    db.prepare(`UPDATE epg_sources SET priority=COALESCE(?,priority), enabled=COALESCE(?,enabled) WHERE id=?`).run(priority, enabled, req.params.id)
+    return { ok: true }
+  })
+
   fastify.delete('/admin/sources/epg/:id', async (req) => {
     const db = getDb()
     db.prepare(`DELETE FROM epg_sources WHERE id=?`).run(req.params.id)
@@ -391,7 +398,14 @@ export default async function adminRoutes(fastify) {
     const { id } = req.query
     if (!id) return reply.code(400).send({ error: 'id requerido' })
     const db = getDb()
-    const entry = db.prepare(`SELECT source_id FROM epg_index WHERE epg_id=? LIMIT 1`).get(id)
+    const entry = db.prepare(`
+      SELECT ei.source_id
+      FROM epg_index ei
+      JOIN epg_sources es ON es.id = ei.source_id
+      WHERE ei.epg_id = ? AND es.enabled = 1
+      ORDER BY COALESCE(es.priority, 50) ASC, es.last_fetched DESC
+      LIMIT 1
+    `).get(id)
     if (!entry) return { programs: [], message: 'EPG ID no encontrado' }
     const cacheFile = `./data/epg-cache/epg_${entry.source_id}.xml`
     try {

@@ -138,25 +138,46 @@ export function generateConsolidatedEPG() {
     lines.push(`  </channel>`)
   })
 
-  // Extraer programas reales de los XMLTVs cacheados
+  // Extraer programas, deduplicando por (channel_id, start) → gana mayor prioridad / más reciente
+  const programmesByKey = new Map() // key: "channel|start" → { block, sourceFile }
   if (existsSync(cacheDir)) {
     let files = []
     try { files = readdirSync(cacheDir).filter(f => f.endsWith('.xml')) } catch(e) {}
+
+    // Mapa de prioridades por archivo de cache (epg_<id>.xml → priority)
+    const sourcePriorityRows = db.prepare(`SELECT id, COALESCE(priority,50) as priority, last_fetched FROM epg_sources WHERE enabled=1`).all()
+    const sourcePriority = {}
+    sourcePriorityRows.forEach(r => { sourcePriority[`epg_${r.id}.xml`] = { priority: r.priority, last_fetched: r.last_fetched || '' } })
+
+    // Ordenar archivos por prioridad asc, last_fetched desc (mejor primero)
+    files.sort((a, b) => {
+      const pa = sourcePriority[a] || { priority: 999, last_fetched: '' }
+      const pb = sourcePriority[b] || { priority: 999, last_fetched: '' }
+      if (pa.priority !== pb.priority) return pa.priority - pb.priority
+      return pb.last_fetched.localeCompare(pa.last_fetched)
+    })
+
     for (const file of files) {
       try {
         const xml = readFileSync(join(cacheDir, file), 'utf8')
-        // Regex para extraer bloques <programme>
-        const progRegex = /<programme\s[^>]*channel="([^"]+)"[^>]*>[\s\S]*?<\/programme>/g
+        const progRegex = /<programme\s[^>]*>[\s\S]*?<\/programme>/g
         let match
         while ((match = progRegex.exec(xml)) !== null) {
-          const channelId = match[1].toLowerCase()
-          if (channelMap[channelId]) {
-            lines.push('  ' + match[0])
-          }
+          const block = match[0]
+          const channelMatch = block.match(/channel="([^"]+)"/)
+          const startMatch = block.match(/start="([^"]+)"/)
+          if (!channelMatch || !startMatch) continue
+          const channelId = channelMatch[1].toLowerCase()
+          const start = startMatch[1]
+          if (!channelMap[channelId]) continue
+          const key = `${channelId}|${start}`
+          // Solo agregar si no existe (la primera fuente que llegue gana = mayor prioridad)
+          if (!programmesByKey.has(key)) programmesByKey.set(key, block)
         }
       } catch(e) { /* skip archivo */ }
     }
   }
+  for (const block of programmesByKey.values()) lines.push('  ' + block)
 
   lines.push('</tv>')
   return lines.join('\n')

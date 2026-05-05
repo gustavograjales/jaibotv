@@ -16,6 +16,8 @@ export function getDb() {
 }
 
 function runMigrations(db) {
+  // Migración idempotente: priority en epg_sources
+  try { db.exec(`ALTER TABLE epg_sources ADD COLUMN priority INTEGER DEFAULT 50`) } catch(e) { /* ya existe */ }
   db.exec(`
     CREATE TABLE IF NOT EXISTS categories (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
