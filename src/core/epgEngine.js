@@ -10,6 +10,7 @@ const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   isArray: (name) => ['channel','programme','display-name','icon'].includes(name),
+  processEntities: false,
 })
 
 let _fuse = null

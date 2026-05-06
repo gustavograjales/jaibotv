@@ -413,6 +413,19 @@ tr:hover td{background:rgba(255,255,255,.02)}
 </div>
 
 <script>
+// Helper: convierte timestamp UTC de SQLite a hora local CST (America/Mexico_City)
+function formatLocalCST(utcString, mode = 'datetime') {
+  if (!utcString) return '-'
+  const iso = utcString.includes('T') ? utcString : utcString.replace(' ', 'T') + 'Z'
+  const d = new Date(iso)
+  if (isNaN(d)) return utcString
+  const opts = { timeZone: 'America/Mexico_City', hour12: false }
+  if (mode === 'time') {
+    return d.toLocaleTimeString('es-MX', { ...opts, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+  return d.toLocaleString('es-MX', { ...opts, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
 // ═══ CONFIG ═══
 const API = ''   // mismo origen
 let token = localStorage.getItem('jaibo_token') || ''
@@ -493,7 +506,7 @@ async function loadDashboard() {
     logEl.innerHTML = ''
     ;(s.recent_logs||[]).forEach(l=>{
       const cls = l.status==='ok'?'log-ok':'log-err'
-      logEl.innerHTML += `<div><span style="color:var(--tx2)">${l.created_at?.slice(11,19)}</span> <span class="${cls}">[${l.type?.toUpperCase()}] ${l.message}</span></div>`
+      logEl.innerHTML += `<div><span style="color:var(--tx2)">${formatLocalCST(l.created_at, 'time')}</span> <span class="${cls}">[${l.type?.toUpperCase()}] ${l.message}</span></div>`
     })
     if (!s.recent_logs?.length) logEl.innerHTML = '<div style="color:var(--tx2)">Sin actividad reciente</div>'
 
@@ -855,7 +868,7 @@ async function loadSources() {
       <div style="flex:1;min-width:0">
         <div style="font-weight:600">${s.name}</div>
         <div style="font-size:.75rem;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.url||'(manual)'}</div>
-        <div style="font-size:.72rem;color:var(--tx2);margin-top:2px">${s.channel_count} canales · ${s.last_fetched ? 'Actualizado: '+s.last_fetched.slice(0,16) : 'Nunca'}</div>
+        <div style="font-size:.72rem;color:var(--tx2);margin-top:2px">${s.channel_count} canales · ${s.last_fetched ? 'Actualizado: '+formatLocalCST(s.last_fetched, 'datetime') : 'Nunca'}</div>
         ${s.last_error?`<div style="font-size:.72rem;color:var(--ac2);margin-top:2px">${s.last_error}</div>`:''}
       </div>
       <div style="display:flex;gap:6px">
@@ -941,7 +954,7 @@ async function loadEpgSources() {
       <div style="flex:1;min-width:0">
         <div style="font-weight:600">${s.name} <span style="font-size:.72rem;color:var(--tx2)">${s.country||''}</span></div>
         <div style="font-size:.72rem;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.url}</div>
-        <div style="font-size:.72rem;color:var(--tx2);margin-top:2px">${s.channel_count} IDs · ${s.last_fetched?'Actualizado: '+s.last_fetched.slice(0,16):'Nunca'}</div>
+        <div style="font-size:.72rem;color:var(--tx2);margin-top:2px">${s.channel_count} IDs · ${s.last_fetched?'Actualizado: '+formatLocalCST(s.last_fetched, 'datetime'):'Nunca'}</div>
         ${s.last_error?`<div style="font-size:.72rem;color:var(--ac2)">${s.last_error.slice(0,80)}</div>`:''}
       </div>
       <div style="display:flex;gap:6px">

@@ -18,7 +18,7 @@ export async function checkStream(url, timeout = 8000, isRetry = false) {
       method: 'GET',
       signal: controller.signal,
       headers: {
-        'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': '*/*',
         'Range': 'bytes=0-1',
         // NO Referer: tvporinternet2 bloquea con Referer del propio sitio
@@ -70,6 +70,7 @@ export async function checkAllStreams(onProgress = null) {
     results.push(result)
     checked++
     if (onProgress) onProgress({ checked, total: channels.length, channel: ch.name, ok: result.ok })
+    await new Promise(r => setTimeout(r, 300))
   }
 
   return results
