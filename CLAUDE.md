@@ -51,12 +51,13 @@ ipv4.method manual
 - **Process manager:** PM2 (procesos `jaibotv` + `temp-monitor`)
 - **Reverse proxy:** Nginx (instalado, escuchando :80, **sin reverse proxy configurado** todavía)
 - **Otros:** Docker, ffmpeg, UFW firewall
+- **Dependencia destacada:** `undici` para fallback TLS condicional ante certs expirados (sin afectar TLS global del proceso)
 - **Puertos abiertos en UFW:** 22, 80, 443, 3000 (TCP, IPv4 e IPv6)
 - **Sistema de diseño:** JAIBO Design System (CSS variables + theme.ts + Tailwind opcional). Documentación en `docs/design-system.md`, tokens en `src/styles/tokens.css`. Sin frontend framework aún (admin-ui es HTML+JS vanilla).
 
 ## Archivos de configuración
 
-- `ecosystem.config.cjs` — Config PM2 (heap 512MB vía NODE_OPTIONS, max_memory_restart 600M)
+- `ecosystem.config.cjs` — Config PM2 (heap 512MB vía NODE_OPTIONS, max_memory_restart 800M)
 - `tailwind.config.js` — Config Tailwind mapeada a CSS variables del design system (sin instalar aún, listo para cuando se introduzca frontend)
 
 ## Estructura del proyecto
@@ -112,14 +113,14 @@ iptv-server/
 - **Health:** http://192.168.1.250:3000/health
 - **Stats API:** http://192.168.1.250:3000/admin/stats
 
-## Estado actual (auditado el 2026-05-04)
+## Estado actual (auditado el 2026-05-06)
 
 ### Canales
 
-- **Total activos:** 89 (todos `enabled=1`)
-- **Stream OK:** 26 (29%)
-- **Stream error:** 0 (tvporinternet2 resuelto ✅)
-- **Última verificación:** 2026-05-04 23:18
+- **Total activos:** 94 (todos `enabled=1`)
+- **Stream OK:** 80 (85%) — gran salto tras fix de UA Chrome en streamChecker
+- **Stream error:** 14 (mayoría rate-limit residual de tvpori, 4 con tokens IP vieja, 1 stream realmente caído)
+- **Última verificación:** 2026-05-06 21:15 (cron cada 6h activo)
 
 ### Distribución por categoría
 
@@ -285,6 +286,37 @@ Cada `git push` pide usuario y PAT. Migrar a SSH o configurar credential helper.
 
 El parser de `<programme>` en `generateConsolidatedEPG()` asumía que `channel` y `start` venían en orden fijo. PlutoTV/Samsung publican `<programme channel="..." start="...">`, pero OPEN EPG España publica `<programme start="..." stop="..." channel="...">`. Solo capturaba ~7 canales de 71. **Detectado y corregido el 2026-05-05** — regex ahora extrae atributos por separado tras matchear el bloque entero. Lección: nunca asumir orden de atributos en XML.
 
+### 12. Pendientes post-auditoría 2026-05-06
+
+**a) 5 canales sin re-scrape (tokens IP vieja):**
+- DirecTV Sports+, Sky Sports LaLiga, A&E, Universal, Disney Channel
+- Sus columnas `scraped_at` y `tvpori_scraped_at` están vacías → no están en `TVPORI_CHANNELS` o sus scrapes fallan silenciosamente
+- Investigar lista en `tvporiScraper.js` y stream_id de Disney Channel (devuelve 404 consistente)
+
+**b) ~9 canales con rate-limit residual de tvpori:**
+- A pesar del delay de 300ms entre canales en `checkAllStreams`, algunos canales sensibles dan 403 intermitente
+- Considerar backoff exponencial o concurrency=1 con delay variable
+
+**c) Bug del entity expansion mitigado pero el parser sigue siendo síncrono:**
+- `processEntities: false` resuelve el límite, pero parsear un XML de 56MB sigue siendo bloqueante para el event loop
+- Migrar a streaming parser (`sax` o `saxes`) sigue siendo válido para producción seria, no urgente
+
+## Lecciones aprendidas (2026-05-06)
+
+1. **tvporinternet2.com bloquea UAs con "curl" o "VLC"** — usar UA Chrome real (`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ... Chrome/124.0`) para el stream checker. Esta sola decisión recuperó 65 canales de 79 marcados como error.
+
+2. **`NODE_TLS_REJECT_UNAUTHORIZED='0'` es global al proceso Node** — NUNCA usarlo. Mientras el scraper lo tenga deshabilitado, TODAS las demás conexiones HTTPS del proceso (otros scrapers, EPG, logos, requests del cliente IPTV) viajan sin validación de cert. Si el proceso crashea entre `=0` y `=1`, queda inseguro permanentemente. Solución correcta: `dispatcher` de undici con `Agent({ connect: { rejectUnauthorized: false } })` SOLO para esa request específica.
+
+3. **fast-xml-parser v4 tiene límite hardcoded de 1000 entity expansions** — `processEntities: false` lo desactiva sin riesgo real. Los strings resultantes contienen `&amp;` literal pero se renderizan correctamente como `&` en HTML del admin y se almacenan así en SQLite sin doble escape al re-serializar.
+
+4. **El servidor de tvpori bloquea con `Referer` del propio sitio** (`https://www.tvporinternet2.com/`) — anti-hotlinking inverso. El streamChecker NO debe enviar Referer.
+
+5. **`pm2 restart` NO recarga `NODE_OPTIONS` ni env vars** — para aplicar cambios en `ecosystem.config.cjs` hay que hacer `pm2 delete + pm2 start` o `pm2 restart --update-env`.
+
+6. **Patches con heredoc largo en SSH se corrompen** — la terminal hace line-wrap en strings largos al pegar, rompiendo el contenido. Para parches programáticos, **escribir el script a archivo en disco** (`cat > /tmp/script.py << 'EOF' ... EOF`) y luego ejecutar (`python3 /tmp/script.py`). NUNCA pegar bloques largos de Python/sed directamente en stdin.
+
+El parser de `<programme>` en `generateConsolidatedEPG()` asumía que `channel` y `start` venían en orden fijo. PlutoTV/Samsung publican `<programme channel="..." start="...">`, pero OPEN EPG España publica `<programme start="..." stop="..." channel="...">`. Solo capturaba ~7 canales de 71. **Detectado y corregido el 2026-05-05** — regex ahora extrae atributos por separado tras matchear el bloque entero. Lección: nunca asumir orden de atributos en XML.
+
 ## Roadmap
 
 ### 🔴 Inmediato (próximas 1-2 sesiones)
@@ -300,9 +332,14 @@ El parser de `<programme>` en `generateConsolidatedEPG()` asumía que `channel` 
 - ~~**Aumentar heap de Node**~~ — ✅ Completado 2026-05-05 (512MB)
 - ~~**Fix cron EPG**~~ — ✅ Completado 2026-05-05 (`'0 4 */7 * *'` → `'0 4 * * *'` diario)
 - ~~**Priorización de fuentes EPG**~~ — ✅ Completado 2026-05-05 (columna `priority`, dedup en XMLTV consolidado, preview prioriza correctamente)
-- **Auto-match de canales sin `epg_id`** — 24 canales pendientes, usar `autoMatchEpgId()` existente en `epgEngine.js`
+- ~~**Bug TLS global eliminado**~~ — ✅ Completado 2026-05-06 (commit `3919c52`): reemplazo de `NODE_TLS_REJECT_UNAUTHORIZED` global por fallback con undici dispatcher solo para requests específicos con cert problemático
+- ~~**streamChecker UA Chrome + delay**~~ — ✅ Completado 2026-05-06 (commit `2a0b3ab`): tvporinternet2 bloquea UA con "VLC" o "curl"; cambio a UA Chrome 124 + delay 300ms entre canales. Stream OK pasó de 15 a 80 (+65 canales)
+- ~~**Cron stream check cada 6h**~~ — ✅ Completado 2026-05-06 (commit `3919c52`): scheduler ejecuta `checkAllStreams()` automáticamente
+- ~~**max_memory_restart subido a 800M**~~ — ✅ Completado 2026-05-06 (commit `3919c52`): el proceso alcanzaba ~750MB durante parseos de XMLTV grandes
+- ~~**Timezone CST en admin UI**~~ — ✅ Completado 2026-05-06 (commit `2a0b3ab`): helper `formatLocalCST()` convierte UTC de SQLite a CST en logs y fechas. Decisión: UTC en DB (estándar industrial), CST solo en UI
+- **Auto-match de canales sin `epg_id`** — 41 canales pendientes (43%). Decisión del usuario 2026-05-06: hacer matching MANUAL desde admin para validar contenido live vs EPG, no usar auto-match masivo
 - **Hardening de `refreshAllEpgSources`** — `Promise.allSettled` con concurrencia limitada (bug #10)
-- **Stream parser para XMLTVs grandes** — sax/saxes en lugar de fast-xml-parser para fuentes >50MB (bug #9)
+- ~~**Stream parser para XMLTVs grandes**~~ — ✅ Completado 2026-05-06 (bug #9): `processEntities: false` en XMLParser de fast-xml-parser v4.5.6 deshabilita el límite hardcoded de 1000 entity expansions. Los strings quedan con `&amp;` literal pero se renderizan correctamente en HTML del admin
 - **Fix cron M3U** — `'0 3 */7 * *'` tiene mismo bug semántico, dejado intencional porque M3U se actualiza manualmente
 - **Auth SSH para git** — eliminar fricción de PAT
 - **Diseño de SVGs reales del logo** — los archivos en `design/logo/` están vacíos (placeholders). Crear/encargar las 3 variantes (signal, monogram, core)
@@ -368,7 +405,7 @@ cp ~/iptv-server/data/iptv.db ~/backups/db/iptv_$(date +%Y%m%d_%H%M%S).db
 
 Cuando termine una fase importante o agregue features grandes, recuérdame **actualizar este CLAUDE.md** con el nuevo estado y hacer commit. Es la fuente de verdad del proyecto.
 
-Última auditoría completa: **2026-05-06** (cache M3U + monitor IP + heap 512MB + EPG refresh + cron fix + OOM mitigado + priorización de fuentes EPG + JAIBO Design System base)
+Última auditoría completa: **2026-05-06** (mañana + tarde, dos sesiones: TLS fallback + streamChecker UA Chrome + entity expansion + timezone UI)
 
 ## Diseño
 
