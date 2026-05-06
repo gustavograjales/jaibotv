@@ -1,5 +1,9 @@
 // src/core/tvporiScraper.js
 import { getDb } from '../db/schema.js'
+import { Agent, fetch as undiciFetch } from 'undici'
+
+// Agent permisivo para fallback ante certs problemáticos (expirados, self-signed, etc.)
+const insecureAgent = new Agent({ connect: { rejectUnauthorized: false } })
 
 export const TVPORI_CHANNELS = [
   // ── DEPORTES
@@ -80,9 +84,7 @@ export async function scrapeTvporiChannel(channel, timeout = 12000) {
   try {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeout)
-    const isDeportes = channel.scrape_host.includes("deportes")
-    if (isDeportes) process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
-    const res = await fetch(url, {
+    const fetchOptions = {
       signal: controller.signal,
       headers: {
         'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
@@ -90,9 +92,22 @@ export async function scrapeTvporiChannel(channel, timeout = 12000) {
         'Accept-Language': 'es-MX,es;q=0.9,en;q=0.8',
         'Referer':         'https://www.tvporinternet2.com/',
       },
-    })
+    }
+    let res
+    try {
+      res = await fetch(url, fetchOptions)
+    } catch (e) {
+      // Fallback ante certs TLS problemáticos (expirado, self-signed, no verificable)
+      const certErrors = ['CERT_HAS_EXPIRED', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'SELF_SIGNED_CERT_IN_CHAIN', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'CERT_NOT_YET_VALID']
+      const code = e.cause?.code || e.code
+      if (certErrors.includes(code)) {
+        console.warn(`⚠️ [tvpori] Cert TLS problemático en ${channel.scrape_host} (${code}), reintentando con agent permisivo`)
+        res = await undiciFetch(url, { ...fetchOptions, dispatcher: insecureAgent })
+      } else {
+        throw e
+      }
+    }
     clearTimeout(timer)
-    if (isDeportes) process.env.NODE_TLS_REJECT_UNAUTHORIZED = "1"
     if (!res.ok) return { ok: false, channel: channel.db_name, error: `HTTP ${res.status}` }
     const html = await res.text()
     const match = html.match(/var\s+src\s*=\s*"(https?:[^"]+\.m3u8[^"]+)"/)

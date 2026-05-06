@@ -6,6 +6,7 @@ import { scrapeAllTvtvChannels } from './tvtvScraper.js'
 import { scrapeAllTvporiChannels } from './tvporiScraper.js'
 import { invalidateAll as invalidateM3UCache } from './m3uCache.js'
 import { checkPublicIp } from './ipMonitor.js'
+import { checkAllStreams } from './streamChecker.js'
 
 export function startScheduler() {
   if (!config.scheduler.enabled) return
@@ -44,4 +45,15 @@ cron.schedule('30 */3 * * *', async () => {
 // Monitor de IP publica cada 10 minutos
 cron.schedule('*/10 * * * *', async () => {
   await checkPublicIp()
+}, { timezone: 'America/Mexico_City' })
+
+// Verificar status de streams cada 6 horas (1AM, 7AM, 1PM, 7PM CST)
+cron.schedule('0 */6 * * *', async () => {
+  console.log('[cron] Verificando status de streams...')
+  try {
+    await checkAllStreams()
+    console.log('[cron] ✅ Stream check completado')
+  } catch(e) {
+    console.error('[cron] ❌ Error en stream check:', e.message)
+  }
 }, { timezone: 'America/Mexico_City' })
