@@ -2,7 +2,7 @@
 
 ## Sobre este proyecto
 
-JaiboTV es un servidor IPTV personal que expone una API compatible con Xtream Codes (compatible con IPTV Smarters, IPTVx, TiviMate, etc.), un panel de administración web, EPG engine con búsqueda fuzzy, scrapers automáticos para fuentes con tokens dinámicos, y manejo de logos.
+JaiboTV es un servidor IPTV personal que expone una API compatible con Xtream Codes (compatible con IPTV Smarters, IPTVx, TiviMate, etc.), un panel de administración web, EPG engine con búsqueda fuzzy, scrapers automáticos para fuentes con tokens dinámicos, y manejo de logos. Cuenta con un sistema de diseño propio (JAIBO Design System) documentado en `docs/design-system.md` con tokens centralizados en `src/styles/tokens.css`.
 
 ## Quién soy
 
@@ -52,18 +52,27 @@ ipv4.method manual
 - **Reverse proxy:** Nginx (instalado, escuchando :80, **sin reverse proxy configurado** todavía)
 - **Otros:** Docker, ffmpeg, UFW firewall
 - **Puertos abiertos en UFW:** 22, 80, 443, 3000 (TCP, IPv4 e IPv6)
+- **Sistema de diseño:** JAIBO Design System (CSS variables + theme.ts + Tailwind opcional). Documentación en `docs/design-system.md`, tokens en `src/styles/tokens.css`. Sin frontend framework aún (admin-ui es HTML+JS vanilla).
 
 ## Archivos de configuración
 
 - `ecosystem.config.cjs` — Config PM2 (heap 512MB vía NODE_OPTIONS, max_memory_restart 600M)
+- `tailwind.config.js` — Config Tailwind mapeada a CSS variables del design system (sin instalar aún, listo para cuando se introduzca frontend)
 
 ## Estructura del proyecto
 iptv-server/
 ├── config.js              # Config general (SERVER_IP centralizado)
 ├── ecosystem.config.cjs   # Config PM2 (heap 512MB, max_memory_restart 600M)
+├── tailwind.config.js     # Config Tailwind mapeada a tokens del design system
 ├── package.json
 ├── package-lock.json
 ├── CLAUDE.md              # Este archivo (fuente de verdad)
+├── docs/
+│   └── design-system.md   # Documentación completa del JAIBO Design System
+├── design/
+│   ├── logo/              # SVGs oficiales (jaibo-signal, jaibo-monogram, jaibo-core)
+│   ├── mockups/           # Mockups de pantallas (pendiente poblar)
+│   └── references/        # Inspiración visual + README
 ├── data/                  # SQLite + caches (ignorado por git)
 │   ├── iptv.db
 │   ├── epg-cache/         # XMLTVs descargados de fuentes EPG
@@ -74,6 +83,9 @@ iptv-server/
     ├── server.js          # Entry point
     ├── admin-ui/
     │   └── index.html     # Panel admin web (SPA monolítico)
+    ├── styles/
+    │   ├── tokens.css     # CSS variables — fuente única de verdad del design system
+    │   └── theme.ts       # Tokens consumibles desde TypeScript
     ├── api/
     │   ├── admin.js       # REST API admin
     │   └── xtream.js      # Xtream Codes API
@@ -280,6 +292,7 @@ El parser de `<programme>` en `generateConsolidatedEPG()` asumía que `channel` 
 - ~~**Scraper tvporinternet2.com**~~ — ✅ Completado (69 canales activos, renovación 3.5h)
 - **Análisis de sitio nuevo** — capturar URLs de streams (sitio pendiente de compartir)
 - ~~**Cachear M3U en memoria**~~ — ✅ Completado 2026-05-05 (TTL=60s + invalidación en eventos)
+- ~~**Sistema de diseño base (JAIBO Design System)**~~ — ✅ Completado 2026-05-06 (commit `7029844`): tokens.css, theme.ts, tailwind.config.js, docs/design-system.md, estructura `design/`, sección de diseño en CLAUDE.md
 
 ### 🟡 Corto plazo
 
@@ -292,6 +305,9 @@ El parser de `<programme>` en `generateConsolidatedEPG()` asumía que `channel` 
 - **Stream parser para XMLTVs grandes** — sax/saxes en lugar de fast-xml-parser para fuentes >50MB (bug #9)
 - **Fix cron M3U** — `'0 3 */7 * *'` tiene mismo bug semántico, dejado intencional porque M3U se actualiza manualmente
 - **Auth SSH para git** — eliminar fricción de PAT
+- **Diseño de SVGs reales del logo** — los archivos en `design/logo/` están vacíos (placeholders). Crear/encargar las 3 variantes (signal, monogram, core)
+- **Instalar tipografías Inter + Space Grotesk** — definidas en tokens pero no cargadas (`@fontsource/inter` y `@fontsource/space-grotesk` cuando se introduzca frontend)
+- **Primer mockup en `design/mockups/`** — empezar por refresh visual del admin-ui aplicando tokens
 
 ### Fase 5 ⏳ — Acceso remoto seguro
 
@@ -352,7 +368,7 @@ cp ~/iptv-server/data/iptv.db ~/backups/db/iptv_$(date +%Y%m%d_%H%M%S).db
 
 Cuando termine una fase importante o agregue features grandes, recuérdame **actualizar este CLAUDE.md** con el nuevo estado y hacer commit. Es la fuente de verdad del proyecto.
 
-Última auditoría completa: **2026-05-05** (cache M3U + monitor IP + heap 512MB + EPG refresh + cron fix + OOM mitigado + priorización de fuentes EPG)
+Última auditoría completa: **2026-05-06** (cache M3U + monitor IP + heap 512MB + EPG refresh + cron fix + OOM mitigado + priorización de fuentes EPG + JAIBO Design System base)
 
 ## Diseño
 
@@ -394,6 +410,10 @@ JAIBO es una plataforma de contenido basada en señal inteligente (streaming + s
 - `src/styles/tokens.css` → tokens como CSS variables (fuente única de verdad)
 - `src/styles/theme.ts` → tokens consumibles desde TypeScript
 - `tailwind.config.js` → tokens mapeados a clases utilitarias
+
+### Metadata
+- Fase base completada: **2026-05-06** (commit `7029844`)
+- Estado actual: estructura + tokens + documentación. SVGs del logo y tipografías pendientes.
 
 ### Referencia completa
 Ver: `docs/design-system.md`
