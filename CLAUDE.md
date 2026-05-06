@@ -353,3 +353,47 @@ cp ~/iptv-server/data/iptv.db ~/backups/db/iptv_$(date +%Y%m%d_%H%M%S).db
 Cuando termine una fase importante o agregue features grandes, recuérdame **actualizar este CLAUDE.md** con el nuevo estado y hacer commit. Es la fuente de verdad del proyecto.
 
 Última auditoría completa: **2026-05-05** (cache M3U + monitor IP + heap 512MB + EPG refresh + cron fix + OOM mitigado + priorización de fuentes EPG)
+
+## Diseño
+
+JAIBO es una plataforma de contenido basada en señal inteligente (streaming + sistema).
+
+### Identidad
+- Estilo: premium tech, minimalista, oscuro
+- Inspiración: señal, ondas, transmisión, sistema
+- Evitar: estética deportiva tradicional (escudos, balones, etc.)
+
+### Colores base
+- Fondo: `#0A0A0A`
+- Primario: `#00AEEF`
+- Accent: `#00FFC6`
+- Gris UI: `#1E1E1E`
+- Blanco: `#FFFFFF`
+
+### Logo
+- Principal: JAIBO Signal (ondas simétricas)
+- Alterno: Monograma "J"
+- Uso: limpio, sin efectos pesados
+
+### Principios
+- Simplicidad > decoración
+- Velocidad > complejidad
+- Sistema > contenido aislado
+
+### Reglas de uso (importante)
+- NUNCA hardcodear colores, spacing o radius en componentes
+- SIEMPRE usar tokens de `src/styles/tokens.css` o `src/styles/theme.ts`
+- Si un valor no existe como token, primero agregarlo al sistema y luego usarlo
+- Antes de crear un componente nuevo, revisar si ya existe en `docs/design-system.md`
+
+### Estructura del sistema de diseño
+- `docs/design-system.md` → documentación completa (logo, paleta, tipografía, componentes)
+- `design/logo/` → SVGs oficiales del logo en sus variantes
+- `design/mockups/` → mockups y comps de pantallas
+- `design/references/` → inspiración y referencias visuales
+- `src/styles/tokens.css` → tokens como CSS variables (fuente única de verdad)
+- `src/styles/theme.ts` → tokens consumibles desde TypeScript
+- `tailwind.config.js` → tokens mapeados a clases utilitarias
+
+### Referencia completa
+Ver: `docs/design-system.md`

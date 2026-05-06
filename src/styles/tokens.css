@@ -1,0 +1,90 @@
+:root {
+  /* ========================================
+     COLORES BASE (no usar directamente en componentes)
+     ======================================== */
+  --color-bg: #0A0A0A;
+  --color-primary: #00AEEF;
+  --color-accent: #00FFC6;
+  --color-ui: #1E1E1E;
+  --color-text: #FFFFFF;
+
+  /* ========================================
+     COLORES SEMÁNTICOS (usar estos en componentes)
+     ======================================== */
+  --color-surface: var(--color-ui);
+  --color-surface-elevated: #2A2A2A;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+
+  --color-text-primary: var(--color-text);
+  --color-text-muted: rgba(255, 255, 255, 0.6);
+  --color-text-subtle: rgba(255, 255, 255, 0.4);
+
+  /* Estados */
+  --color-success: #00FFC6;
+  --color-error: #FF3B5C;
+  --color-warning: #FFB800;
+
+  /* Interactivos */
+  --color-focus-ring: var(--color-primary);
+  --color-hover-overlay: rgba(255, 255, 255, 0.04);
+
+  /* ========================================
+     TIPOGRAFÍA
+     ======================================== */
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.5rem;     /* 24px */
+  --text-2xl: 2rem;      /* 32px */
+  --text-3xl: 2.75rem;   /* 44px */
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.7;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* ========================================
+     SPACING (escala base 8px)
+     ======================================== */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  /* ========================================
+     RADIUS
+     ======================================== */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  /* ========================================
+     SOMBRAS Y GLOWS
+     ======================================== */
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.6);
+  --glow-primary: 0 0 24px rgba(0, 174, 239, 0.4);
+  --glow-accent: 0 0 24px rgba(0, 255, 198, 0.35);
+
+  /* ========================================
+     MOTION
+     ======================================== */
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
