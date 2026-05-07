@@ -137,3 +137,179 @@ Cambiar la búsqueda por nombre a búsqueda por `(tvpori_host, tvpori_stream_id)
 - **SVGs reales del logo** — `design/logo/` tiene placeholders vacíos. Crear las 3 variantes (signal, monogram, core)
 - **Tipografías Inter + Space Grotesk** — definidas en tokens pero no instaladas (`@fontsource/inter` y `@fontsource/space-grotesk` cuando se introduzca frontend)
 - **Primer mockup** — empezar por refresh visual del admin-ui aplicando tokens
+## 🟣 Refactor estructural futuro
+
+> Estado: planeado, NO implementar durante fase actual de estabilización.
+>
+> Razón: el proyecto ya evolucionó de una aplicación monolítica simple a una plataforma IPTV modular con backend, scrapers, scheduler, panel admin, sistema visual y futura separación frontend/backend.
+
+### Objetivos del refactor
+
+- Separar claramente backend, frontend, design system e infraestructura
+- Preparar el proyecto para Docker Compose y despliegues modulares
+- Permitir frontend independiente (React/Vite)
+- Centralizar branding y design tokens
+- Facilitar trabajo multi-IA (ChatGPT / Claude / Cursor)
+- Reducir acoplamiento entre panel admin, scrapers y API IPTV
+- Formalizar scripts operativos y tooling
+
+### Estructura objetivo
+
+```text
+PROJECT/
+│
+├── docs/
+│   ├── architecture/
+│   ├── infra/
+│   ├── api/
+│   ├── roadmap/
+│   ├── bugs/
+│   └── handoff/
+│
+├── backend/
+│   ├── src/
+│   ├── data/
+│   ├── tests/
+│   ├── package.json
+│   └── ecosystem.config.cjs
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── components/
+│   ├── pages/
+│   ├── styles/
+│   ├── assets/
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── design/
+│   ├── brand/
+│   │   ├── logos/
+│   │   ├── icons/
+│   │   ├── favicon/
+│   │   └── social/
+│   │
+│   ├── tokens/
+│   │   ├── colors.json
+│   │   ├── spacing.json
+│   │   ├── typography.json
+│   │   ├── radius.json
+│   │   └── shadows.json
+│   │
+│   ├── themes/
+│   │   ├── jaibo-dark.ts
+│   │   ├── jaibo-light.ts
+│   │   └── legacy.css
+│   │
+│   ├── guidelines/
+│   │   ├── DESIGN_SYSTEM.md
+│   │   ├── BRAND_GUIDE.md
+│   │   ├── UI_RULES.md
+│   │   ├── ACCESSIBILITY.md
+│   │   └── PROMPTING.md
+│   │
+│   ├── mockups/
+│   │   ├── admin/
+│   │   ├── mobile/
+│   │   ├── dashboard/
+│   │   └── onboarding/
+│   │
+│   ├── exports/
+│   │   ├── figma/
+│   │   ├── canva/
+│   │   └── svg/
+│   │
+│   └── ai/
+│       ├── image-prompts/
+│       ├── ui-prompts/
+│       └── visual-reference/
+│
+├── scripts/
+│   ├── backup/
+│   ├── restore/
+│   ├── maintenance/
+│   ├── migrations/
+│   └── diagnostics/
+│
+├── docker/
+│   ├── dev/
+│   ├── prod/
+│   ├── nginx/
+│   └── compose/
+│
+├── .github/
+│
+├── README.md
+├── CLAUDE.md
+└── package.json
+
+Decisiones importantes
+1. design/ será la fuente de verdad visual
+
+Todos los assets visuales y reglas de branding vivirán fuera del frontend.
+
+El frontend consumirá:
+
+logos exportados
+tokens
+themes
+variables CSS
+guidelines
+
+pero NO será dueño de los archivos maestros.
+
+2. Los tokens visuales serán centralizados
+
+Colores, spacing, radius, tipografías y sombras vivirán en:
+
+/design/tokens/
+
+Objetivo:
+
+sincronización frontend/design
+coherencia visual
+reutilización futura en apps móviles
+compatibilidad con IA generativa
+3. El panel admin eventualmente se separará del backend
+
+El admin actual es SPA monolítica embebida.
+
+Objetivo futuro:
+
+frontend React/Vite independiente
+backend API-only
+workers separados para scrapers y scheduler
+4. scripts/ centralizará automatización operativa
+
+Incluye:
+
+backups
+restores
+migraciones
+diagnósticos
+mantenimiento
+limpieza
+utilidades SSH
+5. docker/ preparará despliegues reproducibles
+
+Objetivo futuro:
+
+docker compose
+nginx reverse proxy
+separación api/workers/frontend
+despliegues reproducibles
+Cuándo ejecutar este refactor
+
+NO ejecutar durante:
+
+estabilización actual
+pruebas IPTV de mayo
+mientras existan bugs críticos de scrapers/importaciones
+
+Ejecutar después de:
+
+implementar staging validator
+estabilizar imports
+separar frontend real
+introducir Docker Compose
