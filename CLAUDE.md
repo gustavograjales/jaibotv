@@ -321,6 +321,15 @@ El parser de `<programme>` en `generateConsolidatedEPG()` asumía que `channel` 
 
 ### 🔴 Inmediato (próximas 1-2 sesiones)
 
+- **🆕 Validador de importaciones masivas** — cuando una fuente M3U trae +N canales nuevos en un solo refresh, pasar por staging antes de publicar. Validaciones propuestas:
+  1. Stream check de cada URL nueva (HEAD/GET con timeout corto)
+  2. Mapeo de categoría: si viene en inglés, traducir a categoría española existente o sugerir crear nueva
+  3. Auto-match EPG ID (con score mínimo de confianza)
+  4. Auto-match logo (con score mínimo)
+  5. Marcar como `pending_review=1` si alguna validación falla
+  6. Endpoint admin para revisar/aprobar/rechazar pendientes
+  Detectado el 2026-05-07: cron M3U de las 3 AM trajo 156 canales nuevos sin validación, importando 19 categorías inglesas que tuvieron que limpiarse manualmente.
+- **Limpieza de canales no relevantes** — 251 canales actuales incluyen muchos locales/regionales mexicanos sin interés (UACJ-TV, TVP Mazatlán, etc.). Hacer pasada manual desde admin para deshabilitar (~50-100 canales estimados)
 - ~~**Scraper tvporinternet2.com**~~ — ✅ Completado (69 canales activos, renovación 3.5h)
 - ~~**Análisis de sitio nuevo**~~ — capturar URLs de streams (sitio pendiente de compartir)
 - ~~**Cachear M3U en memoria**~~ — ✅ Completado 2026-05-05 (TTL=60s + invalidación en eventos)
