@@ -322,11 +322,12 @@ El parser de `<programme>` en `generateConsolidatedEPG()` asumía que `channel` 
 ### 🔴 Inmediato (próximas 1-2 sesiones)
 
 - ~~**Scraper tvporinternet2.com**~~ — ✅ Completado (69 canales activos, renovación 3.5h)
-- **Análisis de sitio nuevo** — capturar URLs de streams (sitio pendiente de compartir)
+- ~~**Análisis de sitio nuevo**~~ — capturar URLs de streams (sitio pendiente de compartir)
 - ~~**Cachear M3U en memoria**~~ — ✅ Completado 2026-05-05 (TTL=60s + invalidación en eventos)
 - ~~**Sistema de diseño base (JAIBO Design System)**~~ — ✅ Completado 2026-05-06 (commit `7029844`): tokens.css, theme.ts, tailwind.config.js, docs/design-system.md, estructura `design/`, sección de diseño en CLAUDE.md
 
 ### 🟡 Corto plazo
+- **Scraper TV Azteca (MDSTRM)** — reverse engineering del access_token generado en bundle JS de envivo.tvazteca.com. HAR analizado, token no expuesto en network (generado client-side). Canales target: Azteca UNO, Azteca 7 y más. No urgente — canales activos vía tvporinternet2.
 
 - ~~**Monitor de IP pública**~~ — ✅ Completado 2026-05-05 (cron 10 min, bug #1 mitigado)
 - ~~**Aumentar heap de Node**~~ — ✅ Completado 2026-05-05 (512MB)
