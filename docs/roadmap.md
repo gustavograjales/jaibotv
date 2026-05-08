@@ -91,6 +91,10 @@ Cambiar la búsqueda por nombre a búsqueda por `(tvpori_host, tvpori_stream_id)
 
 ### Fase 5 ⏳ — Acceso remoto seguro
 
+> **⏸️ Pospuesta a post-15 mayo (decisión 2026-05-07).**
+> Razón: priorizar prueba de estabilidad con cliente IPTV en red local antes de exponer servicios a internet. Como alternativa de prueba en red distinta, se realizará mudanza física temporal del servidor a casa de Gustavo el fin de semana 9-10 mayo (no requiere hardening ni puertos abiertos). Requisitos previos identificados para Fase 5: cambiar credenciales `admin/admin123`, agregar auth a `/admin/*`, configurar fail2ban, hardening SSH (key-only), reverse proxy nginx + SSL.
+
+
 - Dominio + DuckDNS / Cloudflare
 - Nginx como reverse proxy → :3000
 - Cert SSL (Let's Encrypt o Cloudflare)

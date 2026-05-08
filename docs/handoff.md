@@ -1,11 +1,66 @@
 # Handoff técnico — JaiboTV
+## Sesión 2026-05-08 (viernes)
+
+### Tipo de sesión
+Planificación + sincronización documental.
+
+### Qué se hizo
+
+1. Análisis del estado actual del repositorio y del último handoff
+2. Evaluación de adelantar Fase 5 (acceso remoto seguro) para el fin de semana
+3. Discusión de alternativas: Tailscale, port forward, mudanza física del servidor
+4. Detección de desincronización entre instrucciones del proyecto (Claude.ai) y `CLAUDE.md` del repo
+5. Reescritura de `CLAUDE.md` para sincronizar 1:1 con instrucciones del proyecto
+
+### Archivos modificados
+
+- `CLAUDE.md` — añadida sección "Cómo arrancar cada sesión", reescrito "Cómo responderle a Gustavo", reforzado protocolo de cierre con énfasis "CADA sesión"
+- `docs/handoff.md` — esta entrada
+- `docs/roadmap.md` — nota sobre Fase 5 pospuesta
+
+### Archivos NO modificados
+
+- Código fuente en `src/` — sin tocar
+- `data/iptv.db` — sin tocar
+- Otros `docs/*.md` — sin tocar (no hubo cambios que los afecten)
+
+### Decisiones tomadas
+
+| Decisión | Razón |
+|---|---|
+| Fase 5 NO se adelanta este fin de semana | Requiere hardening (auth admin, fail2ban, SSL, dominio) que no compensa para un solo fin de semana de prueba. Riesgo > beneficio. |
+| Tailscale descartado como alternativa rápida | Usuario prefiere mover el equipo físicamente a su casa. |
+| Mudanza temporal del servidor a red doméstica de Gustavo (9-10 mayo) | Permite probar IPTVx + actualización de listado en red local distinta sin tocar Telmex ni router de casa. |
+| `CLAUDE.md` y "instrucciones del proyecto" en Claude.ai deben converger | Evita divergencia interpretativa. CLAUDE.md es la fuente de verdad en el repo; instrucciones del proyecto son su espejo en la UI de Claude.ai. |
+
+### Pendiente operativo (mudanza fin de semana)
+
+- Backup pre-mudanza en `~/backups/pre-mudanza-YYYYMMDD_HHMMSS/`
+- Crear perfil NetworkManager para red WiFi de casa (datos pendientes: SSID, rango IPs, gateway)
+- Considerar deshabilitar crones de scrapers durante el fin de semana (la IP pública cambia → tokens tvtv invalidados → ruido en logs y carga inútil)
+- Apuntar IPTVx a la nueva IP local en casa
+- Al regresar: reconectar a `INFINITUM44AC`, verificar IP `192.168.1.250` y forzar re-scrape
+
+### Bugs descubiertos / cerrados
+
+Ninguno en esta sesión.
+
+### Siguiente paso recomendado
+
+1. Esperar a que Gustavo confirme rango de IPs de su red de casa para preparar el perfil NetworkManager
+2. Ejecutar mudanza fin de semana 9-10 mayo
+3. Probar IPTVx en red doméstica
+4. Lunes 12 mayo: regresar servidor a su lugar, validar estado, decidir si arrancar Validador de importaciones masivas
+
+---
+
 
 > **Este archivo se actualiza cada sesión de trabajo.**
 > Es el primer archivo que cualquier IA o humano debe leer al retomar el proyecto.
 
 ---
 
-## Última sesión: 2026-05-07 (jueves)
+## Sesión 2026-05-07 (jueves)
 
 ### Tipo de sesión
 
