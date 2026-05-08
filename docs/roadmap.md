@@ -1,6 +1,6 @@
 # Roadmap — JaiboTV
 
-> Estado al: **2026-05-07**
+> Estado al: **2026-05-08**
 > Próxima semana de prueba: **11-15 mayo**
 
 ---
@@ -33,7 +33,7 @@ Cuando una fuente M3U o un scraper trae canales nuevos, deben pasar por staging 
 
 ### Limpieza de canales no relevantes ⏳
 
-~94 canales activos actualmente incluyen locales/regionales mexicanos sin interés editorial (Multimedios Ciudad Juárez, Multimedios Laguna, UACJ-TV, TVP Mazatlán, etc.). Hacer pasada manual desde el admin panel para deshabilitar ~30-50 canales estimados.
+94 canales activos actualmente incluyen locales/regionales mexicanos sin interés editorial (Multimedios Ciudad Juárez, Multimedios Laguna, UACJ-TV, TVP Mazatlán, etc.). Hacer pasada manual desde el admin panel para deshabilitar ~30-50 canales estimados.
 
 ---
 
@@ -45,7 +45,7 @@ Cambiar la búsqueda por nombre a búsqueda por `(tvpori_host, tvpori_stream_id)
 
 ## 🟡 Corto plazo (post-15 mayo)
 
-- **Arreglar cron M3U que procesa fuentes deshabilitadas (Bug #14)** — auditar `aggregator.js` / `scheduler.js` para agregar filtro `WHERE enabled=1`
+- **Validar Bug #14 (cron M3U procesa fuentes deshabilitadas)** — auditar `aggregator.js` / `scheduler.js` para agregar filtro `WHERE enabled=1`
 - **Reducir loop de retries TLS en tvpori (Bug #15)** — cache en memoria de hosts con cert problemático
 - **Auto-match de canales sin `epg_id`** — 41 canales pendientes (43%). Decisión: hacer matching MANUAL desde admin para validar contenido live vs EPG, no auto-match masivo
 - **Hardening de `refreshAllEpgSources`** — migrar de `for...await` secuencial a `Promise.allSettled` con concurrencia limitada (Bug #10)
@@ -55,7 +55,6 @@ Cambiar la búsqueda por nombre a búsqueda por `(tvpori_host, tvpori_stream_id)
 - **Arreglar caso ambiguo regionales/51** — mismo stream_id asociado a nombres distintos en tvpori (Estrella TV vs Universal Cinema)
 
 ---
-
 ## Fases del proyecto
 
 ### Fase 1 ✅ — Backend base
@@ -70,7 +69,7 @@ Cambiar la búsqueda por nombre a búsqueda por `(tvpori_host, tvpori_stream_id)
 - Motor EPG con XMLTVs reales
 - Búsqueda fuzzy con Fuse.js
 - EPG ID picker en admin
-- Consolidación de 25 fuentes con prioridad
+- Consolidación de 19 fuentes con prioridad
 
 ### Fase 3 ✅ — Scrapers
 
@@ -121,17 +120,17 @@ Cambiar la búsqueda por nombre a búsqueda por `(tvpori_host, tvpori_stream_id)
 
 ---
 
-## Estado de canales al 2026-05-07 (post-restore)
+## Estado al 2026-05-08 (post-auditoría)
 
 | Métrica | Valor |
 |---|---|
 | Total canales activos | 94 |
 | Stream OK | ~80 (85%) |
 | Stream error | ~14 |
-| EPG IDs indexados | ~9,261 |
-| Fuentes EPG activas | 25 |
+| EPG IDs indexados | 7,639 |
+| Fuentes EPG activas | 19 (18 ok + 1 error) |
 | Logos indexados | 3,848 |
-| Fuentes M3U | 2 (iptv-org activa, jromero88 deshabilitada) |
+| Fuentes M3U | 2 (ambas habilitadas tras ajuste 2026-05-08) |
 | Usuarios | 1 (admin/admin123) |
 
 ---
@@ -141,182 +140,6 @@ Cambiar la búsqueda por nombre a búsqueda por `(tvpori_host, tvpori_stream_id)
 - **SVGs reales del logo** — `design/logo/` tiene placeholders vacíos. Crear las 3 variantes (signal, monogram, core)
 - **Tipografías Inter + Space Grotesk** — definidas en tokens pero no instaladas (`@fontsource/inter` y `@fontsource/space-grotesk` cuando se introduzca frontend)
 - **Primer mockup** — empezar por refresh visual del admin-ui aplicando tokens
-## 🟣 Refactor estructural futuro
-
-> Estado: planeado, NO implementar durante fase actual de estabilización.
->
-> Razón: el proyecto ya evolucionó de una aplicación monolítica simple a una plataforma IPTV modular con backend, scrapers, scheduler, panel admin, sistema visual y futura separación frontend/backend.
-
-### Objetivos del refactor
-
-- Separar claramente backend, frontend, design system e infraestructura
-- Preparar el proyecto para Docker Compose y despliegues modulares
-- Permitir frontend independiente (React/Vite)
-- Centralizar branding y design tokens
-- Facilitar trabajo multi-IA (ChatGPT / Claude / Cursor)
-- Reducir acoplamiento entre panel admin, scrapers y API IPTV
-- Formalizar scripts operativos y tooling
-
-### Estructura objetivo
-
-```text
-PROJECT/
-│
-├── docs/
-│   ├── architecture/
-│   ├── infra/
-│   ├── api/
-│   ├── roadmap/
-│   ├── bugs/
-│   └── handoff/
-│
-├── backend/
-│   ├── src/
-│   ├── data/
-│   ├── tests/
-│   ├── package.json
-│   └── ecosystem.config.cjs
-│
-├── frontend/
-│   ├── src/
-│   ├── public/
-│   ├── components/
-│   ├── pages/
-│   ├── styles/
-│   ├── assets/
-│   ├── package.json
-│   └── vite.config.ts
-│
-├── design/
-│   ├── brand/
-│   │   ├── logos/
-│   │   ├── icons/
-│   │   ├── favicon/
-│   │   └── social/
-│   │
-│   ├── tokens/
-│   │   ├── colors.json
-│   │   ├── spacing.json
-│   │   ├── typography.json
-│   │   ├── radius.json
-│   │   └── shadows.json
-│   │
-│   ├── themes/
-│   │   ├── jaibo-dark.ts
-│   │   ├── jaibo-light.ts
-│   │   └── legacy.css
-│   │
-│   ├── guidelines/
-│   │   ├── DESIGN_SYSTEM.md
-│   │   ├── BRAND_GUIDE.md
-│   │   ├── UI_RULES.md
-│   │   ├── ACCESSIBILITY.md
-│   │   └── PROMPTING.md
-│   │
-│   ├── mockups/
-│   │   ├── admin/
-│   │   ├── mobile/
-│   │   ├── dashboard/
-│   │   └── onboarding/
-│   │
-│   ├── exports/
-│   │   ├── figma/
-│   │   ├── canva/
-│   │   └── svg/
-│   │
-│   └── ai/
-│       ├── image-prompts/
-│       ├── ui-prompts/
-│       └── visual-reference/
-│
-├── scripts/
-│   ├── backup/
-│   ├── restore/
-│   ├── maintenance/
-│   ├── migrations/
-│   └── diagnostics/
-│
-├── docker/
-│   ├── dev/
-│   ├── prod/
-│   ├── nginx/
-│   └── compose/
-│
-├── .github/
-│
-├── README.md
-├── CLAUDE.md
-└── package.json
-
-Decisiones importantes
-1. design/ será la fuente de verdad visual
-
-Todos los assets visuales y reglas de branding vivirán fuera del frontend.
-
-El frontend consumirá:
-
-logos exportados
-tokens
-themes
-variables CSS
-guidelines
-
-pero NO será dueño de los archivos maestros.
-
-2. Los tokens visuales serán centralizados
-
-Colores, spacing, radius, tipografías y sombras vivirán en:
-
-/design/tokens/
-
-Objetivo:
-
-sincronización frontend/design
-coherencia visual
-reutilización futura en apps móviles
-compatibilidad con IA generativa
-3. El panel admin eventualmente se separará del backend
-
-El admin actual es SPA monolítica embebida.
-
-Objetivo futuro:
-
-frontend React/Vite independiente
-backend API-only
-workers separados para scrapers y scheduler
-4. scripts/ centralizará automatización operativa
-
-Incluye:
-
-backups
-restores
-migraciones
-diagnósticos
-mantenimiento
-limpieza
-utilidades SSH
-5. docker/ preparará despliegues reproducibles
-
-Objetivo futuro:
-
-docker compose
-nginx reverse proxy
-separación api/workers/frontend
-despliegues reproducibles
-Cuándo ejecutar este refactor
-
-NO ejecutar durante:
-
-estabilización actual
-pruebas IPTV de mayo
-mientras existan bugs críticos de scrapers/importaciones
-
-Ejecutar después de:
-
-implementar staging validator
-estabilizar imports
-separar frontend real
-introducir Docker Compose
 ## 🟣 Refactor estructural futuro
 
 > Estado: planeado, NO implementar durante fase actual de estabilización.

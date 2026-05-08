@@ -15,7 +15,7 @@ tvtvhd.com          ──────────▶  tvtvScraper.js           
 tvporinternet2.com  ──────────▶  tvporiScraper.js  ──▶ xtream.js ──▶ IPTVx
 iptv-org M3U        ──────────▶  aggregator.js     ──▶ M3U/XMLTV    TiviMate
 jromero88 M3U       ──────────▶  aggregator.js
-EPG (25 fuentes)    ──────────▶  epgEngine.js       ──▶ /xmltv.php
+EPG (19 fuentes)    ──────────▶  epgEngine.js       ──▶ /xmltv.php
 tv-logo/tv-logos    ──────────▶  logoEngine.js
 ```
 
@@ -100,7 +100,7 @@ Noticias, Deportes, Entretenimiento, Películas, Series, Infantil, Documentales,
 
 ### `epg_sources`
 
-25 fuentes activas XMLTV. Columna `priority` (menor = mayor prioridad) para resolver conflictos cuando varias fuentes publican el mismo `epg_id`.
+19 fuentes XMLTV (18 ok + 1 error). Columna `priority` (menor = mayor prioridad) para resolver conflictos cuando varias fuentes publican el mismo `epg_id`.
 
 ### `m3u_sources`
 
@@ -108,7 +108,7 @@ Fuentes M3U. Columna relevante: `last_fetched` (NO `last_refresh` — CLAUDE.md 
 
 | id | nombre | enabled | status |
 |---|---|---|---|
-| 1 | IPTV México jromero88 | 0 | ok |
+| 1 | IPTV México jromero88 | 1 | ok |
 | 4 | iptv-org México | 1 | ok |
 
 ### `system_state`
@@ -152,8 +152,8 @@ Cada 3.5h → tvporiScraper: 69 canales → UPDATE url_hd (o INSERT si nombre no
 ### Procesamiento EPG
 
 ```
-Diario 04:00 → epgEngine: descarga 25 XMLTVs → parsea → consolida con dedup por priority
-             → indexa con Fuse.js (9,261 entradas)
+Diario 04:00 → epgEngine: descarga 19 XMLTVs → parsea → consolida con dedup por priority
+             → indexa con Fuse.js (7,639 entradas)
 Cliente → GET /xmltv.php → devuelve XMLTV consolidado (~1.2s)
 ```
 
@@ -166,7 +166,7 @@ Cliente → GET /xmltv.php → devuelve XMLTV consolidado (~1.2s)
 | tvtv scrape | cada 4h | Renueva tokens 12 canales premium |
 | tvpori scrape | cada 3.5h | Renueva tokens 69 canales |
 | Stream check | cada 6h | Verifica status de todos los canales |
-| EPG refresh | diario 04:00 | Descarga y consolida 25 XMLTVs |
+| EPG refresh | diario 04:00 | Descarga y consolida 19 XMLTVs |
 | M3U refresh | `0 3 */7 * *` | Importa fuentes M3U (semanal, dejado intencional) |
 | IP monitor | cada 10 min | Detecta cambio IP pública → re-scrape tvtv |
 

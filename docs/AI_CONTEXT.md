@@ -60,7 +60,7 @@ Gustavo Grajales (`gustavograjales` en GitHub). Trabaja en este proyecto como de
 
 1. **Xtream Codes API** para compatibilidad universal con clientes IPTV
 2. **M3U devuelve URLs proxy** del tipo `/live/admin/admin123/{stream_id}.ts`, no URLs directas (los tokens del origen rotan cada pocas horas)
-3. **EPG se consolida desde 25 fuentes** con columna `priority` (menor = mayor prioridad) para resolver conflictos cuando varias fuentes publican el mismo `epg_id`
+3. **EPG se consolida desde 19 fuentes** (18 ok + 1 error) con columna `priority` (menor = mayor prioridad) para resolver conflictos cuando varias fuentes publican el mismo `epg_id`
 4. **Streams se verifican cada 6h** con UA Chrome (NO `curl` ni `VLC` — tvporinternet2 los bloquea)
 5. **TLS:** undici dispatcher por request específico, NUNCA `NODE_TLS_REJECT_UNAUTHORIZED='0'` global (afecta TODO el proceso)
 6. **Cache M3U en memoria** con TTL=60s + invalidación explícita en eventos
