@@ -5,20 +5,28 @@
 
 ---
 
-## Quién soy
+## Cómo arrancar cada sesión
 
-Gustavo Grajales (`gustavograjales` en GitHub). JaiboTV es mi servidor IPTV personal.
-Accedo al servidor vía SSH desde Windows 11.
+Antes de responder cualquier cosa sustantiva sobre el proyecto, leer
+en este orden:
 
-## Cómo responderme
+1. `CLAUDE.md` (este archivo) — reglas de comportamiento e índice
+2. `docs/AI_CONTEXT.md` — stack, convenciones, decisiones arquitectónicas
+3. `docs/handoff.md` — qué se hizo en la última sesión y siguiente paso
+
+Luego, según lo que pida Gustavo, consultar el archivo específico:
+`docs/architecture.md`, `docs/infra.md`, `docs/api.md`, `docs/roadmap.md`,
+`docs/bugs.md`, `docs/sources.md`, `docs/design-system.md`.
+
+## Cómo responderle a Gustavo
 
 - **Idioma:** español, directo, sin rodeos ni disclaimers innecesarios
 - **Código:** soluciones completas y probadas, no fragmentos sueltos
-- **Comandos:** listos para copiar/pegar, indicando si requieren `sudo`
-- **Cambios en archivos existentes:** muéstrame el diff o la sección exacta, no todo el archivo
-- **Cambios grandes:** pregúntame antes de proponer refactors mayores
-- **Información faltante:** pídemela explícitamente (logs, configs, estado actual)
-- **Antes de concluir una causa raíz:** pide un query o comando verificador. No asumir.
+- **Comandos de terminal:** listos para copiar/pegar, indicando si requieren `sudo`
+- **Cambios en archivos existentes:** mostrar el diff o la sección exacta, no todo el archivo
+- **Antes de proponer refactors o cambios grandes:** preguntar
+- **Antes de concluir una causa raíz:** pedir un query/comando verificador. No asumir.
+- **Información que no se tenga (logs, configs, estado actual):** pedirla explícitamente
 
 ## Dónde está todo
 
@@ -53,7 +61,7 @@ Accedo al servidor vía SSH desde Windows 11.
 
 ## Protocolo de cierre de sesión
 
-**Al terminar cualquier sesión de trabajo, la IA debe recordarle a Gustavo actualizar la documentación antes del commit final.** La regla es simple: si algo cambió, el archivo correspondiente debe reflejarlo.
+**Al terminar CADA sesión de trabajo, antes del commit final, la IA debe recordarle a Gustavo actualizar la documentación.** La regla es simple: si algo cambió, el archivo correspondiente debe reflejarlo.
 
 ### Qué actualizar según lo que ocurrió
 
@@ -68,7 +76,7 @@ Accedo al servidor vía SSH desde Windows 11.
 | Cambiaron convenciones, stack o decisiones de diseño | `docs/AI_CONTEXT.md` |
 | **Siempre, en toda sesión** | `docs/handoff.md` — estado actual, archivos tocados, decisiones, siguiente paso |
 
-### Checklist de cierre (la IA lo recita al final)
+### Checklist de cierre (la IA lo recita al final, antes de proponer commit)
 
 ```
 [ ] docs/handoff.md actualizado con:
@@ -78,7 +86,7 @@ Accedo al servidor vía SSH desde Windows 11.
       - bugs nuevos/cerrados
       - siguiente paso recomendado
 [ ] Otros docs/ actualizados según la tabla de arriba
-[ ] git add + git commit -m "descripción clara"
+[ ] git add + git commit con formato definido abajo
 [ ] git push
 ```
 
