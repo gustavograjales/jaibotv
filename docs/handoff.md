@@ -1,6 +1,52 @@
 # Handoff técnico — JaiboTV
 
-## Sesión 2026-05-08 (viernes)
+## Sesión 2026-05-08 (viernes) — parte 2
+
+### Tipo de sesión
+Análisis comparativo de repositorio externo + decisión de roadmap.
+
+### Qué se hizo
+
+1. Análisis del repo `jobustamantedev/localTv` (Python FastAPI + React 19 + Vite, con módulo de eventos deportivos integrado vía pltvhd.com)
+2. Comparativa por capa contra JaiboTV: backend, DB, EPG, scrapers, frontend, sistema de diseño, madurez operacional
+3. Conclusión: localTv es técnicamente inferior a JaiboTV en la mayoría de capas, pero tiene UNA idea valiosa que JaiboTV no tiene: módulo de eventos del día agrupados por competición con badges clicables que llevan al canal correspondiente
+4. Decisión: dejar el módulo de eventos como ítem en roadmap (backlog en investigación), sin comprometer fase. Investigar fuentes disponibles antes de evaluar viabilidad. Mantener prioridad actual (estabilidad + cliente IPTV + mudanza fin de semana 9-10 mayo)
+5. Creada sección nueva `🔵 Backlog en investigación` en `docs/roadmap.md` para alojar este tipo de ítems no comprometidos a fase
+
+### Archivos modificados
+
+- `docs/roadmap.md` — agregada sección "🔵 Backlog en investigación" con módulo de eventos deportivos del día, ubicada entre Fase 9 (IA) y "Estado de canales"
+- `docs/handoff.md` — esta entrada
+
+### Archivos NO modificados
+
+- Código fuente en `src/` — sin tocar
+- `data/iptv.db` — sin tocar
+- Otros `docs/*.md` — sin cambios
+
+### Decisiones tomadas
+
+| Decisión | Razón |
+|---|---|
+| No implementar módulo de eventos ahora | Prioridad actual es estabilidad + prueba cliente IPTV + mudanza fin de semana. Eventos requiere investigación previa de fuentes. |
+| Investigar `pltvhd.com` y alternativas antes de diseñar | localTv usa pltvhd pero no se conoce su estabilidad, términos ni cobertura de ligas latinas. No comprometer arquitectura sin saber qué fuente sostiene el dato. |
+| No copiar otros patrones de localTv | Su seed hardcoded, API REST propia (sin Xtream) y auth en frontend son anti-patrones. JaiboTV ya está mejor en esos puntos. |
+| Confirmación: dirección React+Vite del roadmap es correcta | localTv valida la elección — es exactamente la arquitectura que JaiboTV planea para el frontend separado |
+| Crear sección "Backlog en investigación" en roadmap | No existía sección equivalente. Las fases 5-9 están comprometidas secuencialmente; este tipo de ideas no encajaban ahí. |
+
+### Bugs descubiertos / cerrados
+
+Ninguno en esta sesión.
+
+### Siguiente paso recomendado
+
+1. Continuar plan original (definido en parte 1 de hoy): mudanza fin de semana 9-10 mayo, prueba IPTVx en red doméstica
+2. Lunes 12 mayo: regresar servidor, validar estado
+3. Post-15 mayo: investigar fuentes de eventos deportivos (pltvhd, TheSportsDB, alternativas) y decidir si el módulo entra a alguna fase formal
+
+---
+
+## Sesión 2026-05-08 (viernes) — parte 1
 
 ### Tipo de sesión
 

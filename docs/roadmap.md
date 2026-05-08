@@ -120,6 +120,62 @@ Cambiar la búsqueda por nombre a búsqueda por `(tvpori_host, tvpori_stream_id)
 
 ---
 
+## 🔵 Backlog en investigación
+
+> Ideas que no están comprometidas a fase. Requieren investigación previa
+> antes de evaluar viabilidad y priorización.
+
+### Módulo de eventos deportivos del día
+
+**Estado:** investigación pendiente — no comprometido a fase
+**Origen:** análisis comparativo del repo `jobustamantedev/localTv` (sesión 2026-05-08)
+**Prioridad:** baja, después del 15 mayo
+**Pre-requisitos:** ninguno técnico, pero sí evaluar fuentes
+
+#### Qué sería
+
+Un módulo paralelo al EPG que muestre eventos deportivos del día agrupados
+por competición (NBA, Champions, LigaMX, etc.) con badges clicables que
+lleven al canal correspondiente del catálogo de JaiboTV.
+
+Complementa el EPG (que es por canal/programa) con una vista por evento:
+"¿dónde puedo ver el clásico hoy?" en lugar de "¿qué está pasando en ESPN?".
+
+#### Qué hay que investigar antes de comprometer
+
+1. **Fuente de datos:**
+   - `pltvhd.com` (la que usa localTv) — verificar si expone API pública,
+     términos de uso, estabilidad, formato de respuesta
+   - Alternativas: livesoccertv.com, sportsdb.com (TheSportsDB API), api-football,
+     scraping de páginas tipo marca.com / espn.com
+   - Criterios: cobertura de ligas latinoamericanas (LigaMX, LigaPro, Libertadores),
+     idioma español, gratuidad o costo, rate limits
+2. **Mapeo evento → canal:**
+   - El badge "ESPN" del evento debe resolver a un `channel_id` real del catálogo
+   - Necesita tabla de aliases o búsqueda fuzzy reusando `Fuse.js` del EPG
+3. **Modelo de datos tentativo:**
+   - `events(id, competition, description, start_time, end_time, logo_url, source)`
+   - `event_streams(event_id, channel_id, label, priority)`
+4. **UX en panel admin:**
+   - Tab "Eventos" al lado de "Canales" / "EPG"
+   - Lista agrupada por competición, con búsqueda por equipo/competición/canal
+   - Acción: clic en badge → carga el canal en el reproductor (cuando exista
+     reproductor web) o abre URL Xtream para clientes externos
+
+#### No hacer hasta haber investigado
+
+- Diseñar esquema final
+- Tocar código
+- Asignar fase
+
+#### Lo que NO se va a copiar de localTv
+
+- Seed hardcoded de canales en código (anti-patrón)
+- API REST propia reemplazando Xtream (rompería compatibilidad con clientes IPTV)
+- API key hardcoded en frontend
+
+---
+
 ## Estado al 2026-05-08 (post-auditoría)
 
 | Métrica | Valor |
