@@ -2,12 +2,9 @@
 node_modules/
 
 # Base de datos (NO subir, tiene datos de canales)
-data/iptv.db
-data/iptv.db-shm
-data/iptv.db-wal
-data/m3u-cache/
-data/epg-cache/
-data/logo-index.json
+# data/ — todo el contenido es runtime (DB, caches, backups, logos indexados)
+data/*
+!data/.gitkeep
 
 # Media (muy pesado)
 media/cache/
