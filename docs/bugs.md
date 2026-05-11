@@ -6,6 +6,21 @@
 
 ---
 
+### Bug #15 — Fuentes XMLTV en GZIP no se descomprimían (RESUELTO 2026-05-11)
+
+**Síntoma:** las 4 fuentes EPG Share (DSports, ES, AR, MX) reportaban `0 canales` con status `ok` y generaban 4 errores diarios en el cron EPG de las 4 AM:
+- `Cannot read properties of undefined (reading 'tagName')` (1×)
+- `Maximum nested tags exceeded` (3×)
+
+**Causa raíz:** epgshare01.online sirve archivos `.xml.gz` con content-type `application/octet-stream`. El código asumía que `response.body` era texto XML directo y se lo pasaba al parser, que recibía bytes comprimidos crudos.
+
+**Resolución (commit `bf669c8`):** detección por magic bytes (0x1F 0x8B) + `zlib.gunzipSync` nativo de Node. Sin dependencias nuevas.
+
+**Resultado:** las 4 fuentes pasaron de 0 canales a 4, 305, 82 y 171 respectivamente. Total: +562 entradas EPG nuevas. Los 4 errores diarios desaparecieron.
+
+---
+
+
 ## Bugs activos
 
 ### Bug #1 — IP pública (prioridad media, mitigado)

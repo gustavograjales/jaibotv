@@ -1,5 +1,110 @@
 # Handoff técnico — JaiboTV
 
+## Sesión 2026-05-11 (lunes) — auditoría post-fin de semana + limpieza EPG
+
+### Tipo de sesión
+
+Auditoría del comportamiento del fin de semana (sin actividad humana 9-10 mayo) + bug fix GZIP + limpieza estratégica de fuentes EPG basada en calidad real.
+
+### Hallazgos del fin de semana
+
+**Crones ejecutados sin intervención:**
+- Cron EPG diario 04:00 CST: ✅ corrió 9, 10 y 11 de mayo
+- Cron stream check cada 6h: ✅ corriendo, 80 OK / 14 error estable
+- Cron tvtv 4h y tvpori 3.5h: ✅ corriendo
+- Cron IP monitor 10 min: ✅ corriendo (IP estable: 189.175.131.95)
+- **Cron M3U semanal: NO corrió** (próximo trigger sería 14 mayo)
+- **Cron tvpori: NO creó nuevos duplicados** durante el fin de semana (Bug #13 dormido, sigue con 6 pares originales)
+
+**PM2: 3 días sin restarts** — estabilidad confirmada post-fix de TLS + UA Chrome + entity expansion del 6 mayo.
+
+**Fallback TLS validado en producción real:** el 7 de mayo a las 12:31 UTC (06:31 CST), el cert de `regionales.saohgdasregions.fun` expiró y el fallback con undici se activó correctamente para los 42 canales regionales. Después Let's Encrypt renovó el cert (válido hasta 30 julio) y los warnings desaparecieron solos. El fix del 6 mayo cumplió 100%.
+
+### Bug GZIP descubierto y resuelto
+
+**Síntoma:** Durante 3 días seguidos (9, 10, 11 mayo) el cron EPG de las 4 AM generó 4 errores:
+- 1× `Cannot read properties of undefined (reading 'tagName')`
+- 3× `Maximum nested tags exceeded`
+
+**Causa raíz:** las 4 fuentes EPG Share (DSports, ES, AR, MX) sirven archivos `.xml.gz` con content-type `application/octet-stream`. El parser `fast-xml-parser` recibía los bytes comprimidos crudos y los interpretaba como XML malformado, reventando.
+
+**Solución:** detectar GZIP por magic bytes (0x1F 0x8B) en el response body y descomprimir con `zlib.gunzipSync` nativo antes de pasar al parser. Sin dependencias nuevas. Commit `bf669c8`.
+
+**Resultados:**
+- EPG Share DSports: 0 → 4 canales (1.5 KB → 14 KB)
+- EPG Share ES: 0 → 305 canales (1.9 MB → 16.2 MB)
+- EPG Share AR: 0 → 82 canales (228 KB → 2.8 MB)
+- EPG Share MX: 0 → 171 canales (399 KB → 5.3 MB)
+
+### Auditoría de calidad EPG (analítica)
+
+Script que cuenta `<programme>`, `<desc>`, `<category>`, `<icon>`, `<episode-num>` por fuente XMLTV en cache. Permitió identificar las fuentes verdaderamente útiles vs las que solo aportan títulos sin descripción.
+
+**Hallazgo crítico:** las 2 fuentes con más matches en el catálogo (GlobeTV México 2 y Open EPG Mx) tenían **0% de descripciones**. Estaban "ganando" la asignación a 33 canales con priority=50 igualada a las fuentes ricas. Por eso los clientes IPTV veían guías "vacías" en muchos canales.
+
+### Limpieza estratégica ejecutada
+
+**A) Re-priorización (SQL directo, sin commit de código):**
+
+| Priority | Fuentes |
+|---|---|
+| 10 (autoritativas) | PlutoTV Global, PlutoTV México, IPTV EPG, EPG Share ES |
+| 30 (complementarias) | Samsung TV Plus, GlobeTV México 1, EPG Share AR, EPG Share MX |
+| 50 (default) | GlobeTV España 1 |
+| 80 (pobres, ahora eliminadas) | GlobeTV México 2, Open EPG Mx, OPEN EPG Esp×5, Free EPG Lite, Free EPG Ru, EPG Share DSports |
+
+**B) Limpieza de `epg_id` en los 94 canales + bulk auto-match:**
+
+- 80 de 94 canales matcheados (85%)
+- Distribución de matches: GlobeTV México 1 (30), Open EPG Mx (21), GlobeTV México 2 (20), PlutoTV Global (17), PlutoTV México (7), IPTV EPG (7), otros
+
+**C) Eliminación de 10 fuentes basura (SQL directo):**
+- Borradas: ids 12, 29, 30, 31, 32, 33, 34, 36, 39, 42
+- Liberadas 59 MB de cache (171 MB → 112 MB)
+- Quedaron 9 fuentes activas
+
+**D) Refresh completo final:**
+- EPG index: 6,568 entradas (consolidado tras priorización)
+- 9 fuentes todas `ok`
+- 80 canales con epg_id, 14 sin matchear (los más exóticos)
+- **24 canales quedaron con `epg_id` huérfano** (sus IDs venían de fuentes ahora eliminadas) — Gustavo los re-asignará manualmente desde admin
+
+### Estado del servidor al cierre
+
+- **Servicio:** `jaibotv` online en PM2, restart count: 2 (esperado tras los cambios)
+- **Memoria:** ~129 MB (OK, dentro de límite 800M)
+- **Canales activos:** 94
+- **Streams:** 80 ok / 14 error (estable desde el viernes)
+- **Fuentes EPG:** 9 activas (vs 19 al inicio)
+- **EPG IDs indexados:** 6,568
+- **Cache EPG en disco:** 112 MB (vs 171 MB al inicio)
+- **IP pública:** 189.175.131.95 (sin cambios desde 2026-05-04)
+- **Crones:** todos activos
+
+### Commits del día
+bf669c8  fix(epg): detectar y descomprimir fuentes XMLTV en GZIP
+
+(La limpieza EPG fue SQL directo, no commits de código.)
+
+### Pendiente — siguiente sesión
+
+1. **Manual:** reasignar EPG ID a los 24 canales con id huérfano (lista en backup `iptv_pre-epg-cleanup_20260511_152253.db`):
+   A&E, A&E Discovery, ADN 40, Canal del Congreso, DAZN 1, DAZN F1, DSports, ESPN 4, ESPN 4 MX, ESPN 4 US, ESPN Premium, Fox Sports Premium, H&H Discovery, Movistar Deportes, Movistar Liga, Movistar+ Liga de Campeones, Nat Geo, TNT Novelas, TNT Series, Unicable, Universal Channel, Universal Cinema, Universal Premiere, Win Sports plus
+
+2. **Bug #13 (duplicados tvpori):** decidir si fix puntual en `tvporiScraper.js:136` o esperar al Validador de importaciones. Lleva 6 pares dormidos desde el 7 de mayo, sin crecer.
+
+3. **Bug #14 (jromero88):** seguirá indeterminado hasta que corra el cron M3U semanal (próximo trigger: 14 mayo).
+
+4. **Probar acceso desde cliente IPTV** (Smarters/TiviMate) ahora que el EPG quedó limpio y prioritizado.
+
+### Backups creados en esta sesión
+~/backups/db/iptv_pre-epg-cleanup_20260511_152253.db  ← estado pre-limpieza
+~/backups/db/iptv_pre-epg-cleanup_20260511_152445.db  ← duplicado (segundo cp)
+~/backups/epgEngine.js.pre-gzip-fix-*                 ← código pre-patch GZIP
+### Último commit antes de esta sesión
+---
+
+
 ## Sesión 2026-05-08 (viernes) — parte 2
 
 ### Tipo de sesión
