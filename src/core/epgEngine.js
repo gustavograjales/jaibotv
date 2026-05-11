@@ -4,6 +4,7 @@ import { join } from 'path'
 import got from 'got'
 import Fuse from 'fuse.js'
 import { getDb } from '../db/schema.js'
+import { gunzipSync } from 'node:zlib'
 import config from '../../config.js'
 
 const parser = new XMLParser({
@@ -24,8 +25,13 @@ export async function fetchEpgSource(source) {
     const response = await got(source.url, {
       timeout: { request: config.http.timeout },
       retry: { limit: config.http.retries },
+      responseType: 'buffer',
     })
-    const xml = response.body
+    // Detectar GZIP por magic bytes (0x1F 0x8B) — algunas fuentes sirven .xml.gz
+    const body = response.body
+    const isGzip = body[0] === 0x1f && body[1] === 0x8b
+    const xml = isGzip ? gunzipSync(body).toString('utf-8') : body.toString('utf-8')
+    if (isGzip) console.log(`📦 EPG ${source.name}: descomprimido GZIP (${body.length} -> ${xml.length} bytes)`)
     mkdirSync(config.cache.epgDir, { recursive: true })
     writeFileSync(join(config.cache.epgDir, `epg_${source.id}.xml`), xml, 'utf8')
     const channels = parseXMLTVChannels(xml, source.name)
