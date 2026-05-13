@@ -1,5 +1,71 @@
 # Handoff técnico — JaiboTV
 
+
+## Sesión 2026-05-13 PM — Feature Discover UI (preview hls.js + import manual)
+
+### Lo que se hizo
+
+**FEATURE COMPLETADO: Vista admin de descubrimiento tvpori**
+
+1. **Barrido extendido tvpori (1-500 en ambos hosts):**
+   - 998/1000 stream_ids respondieron como "vivos"
+   - 929 nuevos pendientes (no en DB)
+   - Función `discoverTvporiStreams()` mejorada con corte automático tras N errores consecutivos
+
+2. **Backend (src/api/admin.js, +289 líneas):**
+   - `GET /admin/tvpori/discover/pending` — lista filtrada/paginada
+   - `POST /admin/tvpori/skip-discovered` — marcar como saltado
+   - `DELETE /admin/tvpori/skip-discovered/:host/:stream_id` — deshacer skip
+   - `POST /admin/tvpori/import-discovered` — scrape fresco + INSERT con external_id
+   - `GET /admin/tvpori/fresh-url` — scrape fresco para preview
+
+3. **Schema:**
+   - `CREATE TABLE tvpori_skipped (host, stream_id, reason, skipped_at)`
+
+4. **Vista admin nueva (src/admin-ui/discover.html + discover.js):**
+   - Card de un canal a la vez con preview on-demand (hls.js)
+   - Detección automática de calidad FHD/HD/SD/LOW (lee videoWidth × videoHeight)
+   - Form completo: nombre, categoría, EPG ID con autocomplete, logo URL con autocomplete, país
+   - Botones "Skip y siguiente" / "Importar y siguiente"
+   - Paginación, filtros host
+   - Link nav: "🔍 Descubrir tvpori" en admin principal
+
+### Hallazgos críticos durante la sesión
+
+1. **El descubrimiento masivo da MUCHOS falsos positivos.** El scraper reporta "vivo" cuando el HTML tiene `var src=...`, pero la URL final puede dar 403 al consumirla. La tasa real de canales válidos solo se medirá con preview manual.
+
+2. **Validación de canales NO funciona desde server-side.** curl/Python desde el servidor JaiboTV reciben 403 del servidor remoto incluso para canales que SÍ funcionan en cliente IPTV (ej: DAZN F1). El servidor remoto valida algo (probablemente fingerprint TLS o IP del request) que solo cliente IPTV final o browser pueden satisfacer.
+
+3. **JaiboTV NO es proxy real de streaming:** solo hace HTTP 302 redirect. El cliente IPTV final es quien fetcha el .m3u8 directo del servidor remoto.
+
+4. **hls.js en browser SÍ puede reproducir el stream** vía el proxy de JaiboTV (validado con DAZN F1: F1 Miami con Hülkenberg).
+
+### Decisión arquitectónica
+
+**Opción 1 (modelo simple) por ahora:** un canal = una fuente = una URL. El refactor a `channel_sources` (relación 1:N canal lógico → fuentes) se hará durante la migración a VPS (Fase 6 del roadmap).
+
+### Estado actual al cierre
+
+- **41 canales activos** con external_id estable
+- **920 canales tvpori pendientes** de revisar en `/admin/discover.html`
+- **PM2 jaibotv: online, ~18 MB**
+- Backups: `~/backups/db/iptv_pre-discover-ui_20260513_165444.db`, archivos pre-cambio en `~/backups/pre-discover-ui-20260513_165444/`
+
+### Pendiente próxima sesión
+
+1. **Importación manual de canales** usando el discover UI
+2. Identificar cuáles canales son consumibles vs falsos positivos
+3. Asignar nombres reales, categorías, EPG, logos durante import
+4. Documentar tasa real de validez de los 929 descubiertos
+
+### Pendiente refactor VPS (Fase 6 roadmap)
+
+- Tabla `channel_sources` (1:N canal → fuentes)
+- Failover automático en xtream.js basado en priority
+- Migración canales existentes al nuevo modelo
+
+---
+
 ## Sesión 2026-05-11 (lunes) — auditoría post-fin de semana + limpieza EPG
 
 ### Tipo de sesión

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JaiboTV — Descubrimiento tvpori</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    :root {
+      --bg:       #0A0A0A;
+      --surface:  #1E1E1E;
+      --primary:  #00AEEF;
+      --accent:   #00FFC6;
+      --text:     #FFFFFF;
+      --muted:    #999;
+      --error:    #ff5252;
+      --ok:       #00c853;
+      --border:   #333;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      color: var(--primary);
+    }
+    .header .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      margin-left: 16px;
+      font-size: 14px;
+    }
+    .header .nav a:hover { color: var(--accent); }
+    
+    .stats-bar {
+      display: flex;
+      gap: 24px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+    .stats-bar .stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .stats-bar .label { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    .stats-bar .value { color: var(--accent); font-size: 18px; font-weight: 600; }
+    
+    .filters {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-radius: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .filters label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .filters select, .filters input {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+    .filters .btn {
+      margin-left: auto;
+    }
+    
+    .btn {
+      background: var(--primary);
+      color: var(--bg);
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-danger { background: var(--error); color: white; }
+    .btn-success { background: var(--ok); color: white; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    
+    .pagination {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .pagination .info {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .pagination input[type="number"] {
+      width: 70px;
+      text-align: center;
+    }
+    
+    .card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 0 auto;
+      max-width: 900px;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-header .id-block { font-family: monospace; font-size: 14px; }
+    .card-header .id-block .host { color: var(--accent); }
+    .card-header .id-block .stream { color: var(--primary); }
+    .card-header .external-id { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    
+    .preview-area {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .preview-video {
+      background: #000;
+      border-radius: 8px;
+      aspect-ratio: 16/9;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .preview-video video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .preview-placeholder {
+      text-align: center;
+      color: var(--muted);
+      padding: 20px;
+    }
+    .preview-placeholder .btn { margin-top: 12px; }
+    
+    .quality-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.75);
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    
+    .preview-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-row label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+    .form-row input, .form-row select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    .form-row input:focus, .form-row select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .actions .btn { padding: 10px 20px; font-size: 14px; }
+    
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      padding: 12px 20px;
+      border-radius: 6px;
+      max-width: 400px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      transform: translateX(120%);
+      transition: transform 0.3s;
+      z-index: 1000;
+    }
+    .toast.show { transform: translateX(0); }
+    .toast.error { border-left-color: var(--error); }
+    .toast.success { border-left-color: var(--ok); }
+    
+    .log {
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      max-height: 120px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    .log .ok { color: var(--ok); }
+    .log .err { color: var(--error); }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty-state h2 { color: var(--accent); margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📡 Descubrimiento tvpori</h1>
+    <div class="nav">
+      <a href="/admin/">← Volver al admin</a>
+    </div>
+  </div>
+
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat">
+      <span class="label">Pendientes</span>
+      <span class="value" id="stat-pending">—</span>
+    </div>
+    <div class="stat">
+      <span class="label">Total descubiertos</span>
+      <span class="value" id="stat-total">—</span>
+    </div>
+    <div class="stat">
+      <span class="label">Ya importados</span>
+      <span class="value" id="stat-imported">—</span>
+    </div>
+    <div class="stat">
+      <span class="label">Saltados</span>
+      <span class="value" id="stat-skipped">—</span>
+    </div>
+  </div>
+
+  <div class="filters">
+    <label>Host:
+      <select id="filter-host">
+        <option value="both">Ambos</option>
+        <option value="deportes">Deportes</option>
+        <option value="regionales">Regionales</option>
+      </select>
+    </label>
+    <label>Ir a página:
+      <input type="number" id="goto-page" min="1" value="1" />
+    </label>
+    <button class="btn btn-secondary btn-sm" onclick="loadPage()">Aplicar</button>
+  </div>
+
+  <div id="content">
+    <!-- Card del canal actual se renderiza aquí -->
+  </div>
+
+  <div class="pagination" id="pagination">
+    <button class="btn btn-secondary btn-sm" id="btn-prev" onclick="prevPage()">← Anterior</button>
+    <span class="info" id="page-info">—</span>
+    <button class="btn btn-secondary btn-sm" id="btn-next" onclick="nextPage()">Siguiente →</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/admin/discover.js"></script>
+</body>
+</html>

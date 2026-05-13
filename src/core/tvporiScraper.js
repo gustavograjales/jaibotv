@@ -170,3 +170,60 @@ export async function scrapeTvporiByName(dbName) {
   }
   return result
 }
+
+/**
+ * Barrido (discovery) de stream_ids en un host de tvpori.
+ * Itera stream_id de `from` a `to`, llama a scrapeTvporiChannel,
+ * y reporta cuáles están vivos. NO inserta en DB — solo descubre.
+ *
+ * Detiene el barrido automáticamente cuando encuentra N errores consecutivos
+ * (asumiendo que llegamos al final del catálogo del servidor).
+ *
+ * @param {string} scrape_host - 'deportes.ksdjugfsddeports.com' | 'regionales.saohgdasregions.fun'
+ * @param {number} from - stream_id inicial (inclusive)
+ * @param {number} to - stream_id final (inclusive, hard limit)
+ * @param {number} delayMs - ms de espera entre requests (default 1000)
+ * @param {number} stopAfterErrors - corta después de N errores consecutivos (default 5, 0=no corta)
+ * @param {function} onProgress - callback opcional con { checked, total, stream_id, ok }
+ * @returns {Promise<Array>} lista de descubrimientos con { stream_id, ok, url?, error? }
+ */
+export async function discoverTvporiStreams(scrape_host, from, to, delayMs = 1000, stopAfterErrors = 5, onProgress = null) {
+  const results = []
+  const total = to - from + 1
+  let checked = 0
+  let consecutiveErrors = 0
+  let stopped = false
+
+  for (let stream_id = from; stream_id <= to; stream_id++) {
+    const ch = { scrape_host, stream_id: String(stream_id), db_name: `${scrape_host.split('.')[0]}_${stream_id}` }
+    const result = await scrapeTvporiChannel(ch)
+    checked++
+
+    results.push({
+      stream_id,
+      ok: result.ok,
+      url: result.url || null,
+      error: result.error || null,
+      expiresAt: result.expiresAt || null,
+    })
+
+    if (result.ok) {
+      consecutiveErrors = 0
+    } else {
+      consecutiveErrors++
+    }
+
+    if (onProgress) onProgress({ checked, total, stream_id, ok: result.ok, consecutiveErrors })
+
+    // Corte automático si se alcanza el threshold de errores consecutivos
+    if (stopAfterErrors > 0 && consecutiveErrors >= stopAfterErrors) {
+      console.log(`🔎 [discover] ${scrape_host}: corte automático en stream_id=${stream_id} (${consecutiveErrors} errores consecutivos)`)
+      stopped = true
+      break
+    }
+
+    if (stream_id < to) await new Promise(r => setTimeout(r, delayMs))
+  }
+
+  return { results, stopped, lastStreamId: results[results.length - 1]?.stream_id || from - 1 }
+}

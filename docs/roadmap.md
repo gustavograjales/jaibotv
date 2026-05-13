@@ -372,3 +372,60 @@ implementar staging validator
 estabilizar imports
 separar frontend real
 introducir Docker Compose
+
+---
+
+## Validador de Importaciones — ESTADO 2026-05-13
+
+### ✅ Completado (sesión 2026-05-13 PM)
+
+- **Anclaje estable `external_id`** para canales tvpori (formato `tvpori:{slug}:{stream_id}`)
+- **Discover UI tvpori**: vista admin para revisar e importar canales descubiertos uno por uno con preview hls.js
+- **Detección de calidad client-side**: FHD/HD/SD/LOW vía videoWidth × videoHeight
+- **Endpoints**: discover, discover/pending, skip-discovered, import-discovered, fresh-url
+- **Schema**: tabla `tvpori_skipped`
+
+### 🟡 Parcialmente completado
+
+- **Anclaje estable para M3U externos**: pendiente (formato propuesto `m3u:{source_id}:{tvg-id}` o `m3u:{source_id}:url:{hash8}`)
+- **Anclaje para tvtv**: pendiente (formato propuesto `tvtv:{stream_param}`)
+
+### ❌ Pendiente
+
+- **Staging area para canales M3U nuevos** (`pending_channels` con stream_status_before_approve)
+- **UI de aprobación masiva** para canales M3U externos
+- **Auto-sugerencias** de EPG/logo/categoría durante import
+
+---
+
+## Refactor para Migración VPS (Fase 6)
+
+### Pendiente para hacer durante la migración
+
+**Tabla `channel_sources` (1:N canal lógico → fuentes):**
+```sql
+CREATE TABLE channel_sources (
+id INTEGER PRIMARY KEY,
+channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+external_id TEXT UNIQUE NOT NULL,
+url TEXT NOT NULL,
+priority INTEGER DEFAULT 10,
+quality_label TEXT,  -- FHD/HD/SD/LOW
+status TEXT DEFAULT 'unknown',
+last_scraped_at TEXT,
+last_checked_at TEXT,
+created_at TEXT DEFAULT (datetime('now'))
+);
+**Cambios en código necesarios:**
+- `tvporiScraper.js`: actualizar `channel_sources` en lugar de `channels.url_hd`
+- `xtream.js`: en endpoint `/live/`, elegir source con priority más alta + status=ok (failover automático)
+- `aggregator.js`: M3U externos crean canal lógico + source única
+- `admin.js`: endpoints para agregar/quitar sources a canales existentes
+- Admin UI: tab "Fuentes" en edición de canal para gestionar sources
+
+**Migración de datos:**
+- Para cada canal existente con external_id no-null: crear source equivalente
+- Mantener compatibilidad temporal de columnas `url_hd/url_fhd/url_sd` durante transición
+
+---
+

@@ -217,3 +217,70 @@ Secciones disponibles en el SPA:
 | `/get.php` (M3U, sin cache) | 100-500ms |
 | `/xmltv.php` (EPG) | ~1.2s |
 | `/live/{stream_id}.ts` (redirect) | < 10ms |
+
+
+---
+
+## Endpoints Discover tvpori (agregados 2026-05-13)
+
+### POST /admin/tvpori/discover
+Lanza barrido secuencial de stream_ids en hosts tvpori. Async (response inmediato, scan en background).
+
+**Body:**
+```json
+{
+"host": "deportes" | "regionales" | "both",
+"from": 1,
+"to": 500,
+"delay_ms": 1000,
+"stop_after_errors": 5
+}
+**Response:** `{ status: "discovering", hosts, range, delay_ms, stop_after_errors }`
+
+Resultados guardados en `system_state.tvpori_discover_last`.
+
+### GET /admin/tvpori/discover/last
+Resultado del último barrido con resumen por host (scanned, alive, in_db, new_to_db).
+
+### GET /admin/tvpori/discover/pending?host=&page=&page_size=
+Lista filtrada/paginada de canales pendientes (vivos, no en DB, no skipped).
+
+**Response:**
+```json
+{
+"available": true,
+"page": 1,
+"total": 920,
+"total_pages": 920,
+"items": [{ "host", "stream_id", "external_id", "url" }]
+}
+### POST /admin/tvpori/skip-discovered
+Marcar canal como saltado para no re-mostrarlo.
+
+**Body:** `{ host, stream_id, reason? }`
+
+### DELETE /admin/tvpori/skip-discovered/:host/:stream_id
+Deshacer skip.
+
+### POST /admin/tvpori/import-discovered
+Hace scrape FRESCO del stream_id y crea canal en DB con external_id.
+
+**Body:**
+```json
+{
+"host": "deportes" | "regionales",
+"stream_id": 42,
+"name": "ESPN HD",
+"category_id": 2,
+"epg_id": "ESPN.us",
+"logo": "https://...",
+"country": "MX",
+"quality_label": "FHD"
+}
+**Response:** `{ ok: true, channel: { id, name, external_id, stream_id, url_hd, ... } }`
+**Errores:** 409 si ya existe en DB, 502 si scrape falla.
+
+### GET /admin/tvpori/fresh-url?host=&stream_id=
+Scrape fresco que devuelve URL con token nuevo (para preview hls.js).
+
+**Response:** `{ ok: true, url, expiresAt }`

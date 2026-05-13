@@ -271,3 +271,59 @@ Errores documentados de la sesión del 7 de mayo:
 ### 9. El backup automático SÍ existe (lección 2026-05-07)
 
 CLAUDE.md original listaba como deuda técnica #8 "Sin backup automatizado de la DB". Verificación reveló que el backup automático corre diariamente a las 04:00 en `~/backups/db/iptv_YYYYMMDD.db`. Confirmar existencia de servicios antes de declararlos faltantes.
+
+
+---
+
+## BUG-16: Servidor tvpori bloquea requests desde Python/curl con HTTP 403
+
+**Descubierto:** 2026-05-13 durante implementación del Discover UI.
+
+**Síntoma:**
+- Cliente IPTV (TiviMate) reproduce DAZN F1 correctamente vía proxy JaiboTV
+- curl/Python directos al .m3u8 (incluso desde el mismo servidor JaiboTV) reciben HTTP 403
+- VLC desde PC en LAN también recibe 403
+- hls.js en browser SÍ funciona
+
+**Diagnóstico:**
+El servidor remoto `:9092` valida algo del cliente más allá de IP y URL/token. Probablemente:
+- Fingerprint TLS específico (cliente IPTV vs curl)
+- User-Agent dinámico
+- Comportamiento HTTP/2 o Range requests específicos
+
+**Implicación:**
+- **No se puede validar masivamente** la lista de 929 stream_ids descubiertos desde server-side
+- La validación solo es posible visualmente con preview hls.js (browser) o cliente IPTV real
+- Los falsos positivos del descubrimiento solo se descubren al intentar consumir
+
+**Workaround actual:**
+- Preview hls.js en discover UI permite identificar canales válidos uno por uno
+- No hay solución server-side automática
+
+**Status:** WONT-FIX (limitación del servidor remoto, fuera de nuestro control)
+
+---
+
+## BUG-17: Algunos stream_ids reportan "vivos" pero el .m3u8 da 403
+
+**Descubierto:** 2026-05-13 durante pruebas del Discover UI.
+
+**Síntoma:**
+- `discoverTvporiStreams()` reporta `ok: true` con URL extraída del HTML
+- Al hacer fetch del .m3u8 con browser, devuelve 403
+- No es problema de token expirado (URL fresca también falla)
+
+**Causa probable:**
+- El servidor tvpori responde con `var src=` en el HTML para CUALQUIER stream_id válido sintácticamente
+- Pero el endpoint de streaming solo tiene contenido para ciertos stream_ids
+- No hay forma desde el HTML inicial de saber cuál tiene contenido real
+
+**Implicación:**
+- Estimación de 929 "canales nuevos" probablemente tenga muchos falsos positivos
+- Tasa real de validez solo se conocerá tras revisión manual con preview
+
+**Workaround:**
+- Skip rápido en discover UI cuando el preview falla
+- Tabla `tvpori_skipped` evita re-mostrar canales descartados
+
+**Status:** WORKAROUND (no hay solución server-side, manejo manual via UI)

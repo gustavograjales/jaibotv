@@ -1,4 +1,4 @@
-import { scrapeAllTvporiChannels, scrapeTvporiByName, TVPORI_CHANNELS } from '../core/tvporiScraper.js'
+import { scrapeAllTvporiChannels, scrapeTvporiByName, TVPORI_CHANNELS, discoverTvporiStreams, scrapeTvporiChannel } from '../core/tvporiScraper.js'
 import { importTvtvCsv, scrapeAllTvtvChannels } from '../core/tvtvScraper.js'
 import { checkAllStreams, checkChannelById, streamStats } from '../core/streamChecker.js'
 import { buildLogoIndex, searchLogos, autoMatchLogo, logoStats } from '../core/logoEngine.js'
@@ -121,6 +121,293 @@ export default async function adminRoutes(fastify) {
       if (match.icon&&!ch.logo) db.prepare(`UPDATE channels SET logo=? WHERE id=?`).run(match.icon,ch.id)
     }
     return match
+  })
+
+  // ── DESCUBRIMIENTO TVPORI ─────────────────────────────────────────────────
+  // POST /admin/tvpori/discover
+  // Body: { host: 'deportes' | 'regionales' | 'both', from?: 1, to?: 100, delay_ms?: 1000 }
+  // Hace un barrido secuencial de stream_ids en el host indicado y devuelve
+  // cuáles están vivos. NO modifica la base de datos — solo reporta.
+  // Útil para descubrir canales que existen en tvpori pero no están en TVPORI_CHANNELS.
+  fastify.post('/admin/tvpori/discover', async (req, reply) => {
+    const db = getDb()
+    const { host = 'both', from = 1, to = 500, delay_ms = 1000, stop_after_errors = 5 } = req.body || {}
+    
+    const hostMap = {
+      'deportes':   'deportes.ksdjugfsddeports.com',
+      'regionales': 'regionales.saohgdasregions.fun',
+    }
+    
+    const hostsToScan = host === 'both' ? Object.keys(hostMap) : [host]
+    if (hostsToScan.some(h => !hostMap[h])) {
+      return reply.code(400).send({ error: `host inválido. Use 'deportes', 'regionales' o 'both'` })
+    }
+    
+    // Respuesta inmediata, scan en background
+    reply.send({ status: 'discovering', hosts: hostsToScan, range: [from, to], delay_ms, stop_after_errors })
+    
+    // Ejecutar barrido en background
+    ;(async () => {
+      const allResults = {}
+      for (const hostKey of hostsToScan) {
+        const scrape_host = hostMap[hostKey]
+        console.log(`🔎 [discover] Iniciando barrido ${hostKey} (${from}-${to}) con delay ${delay_ms}ms`)
+        const { results, stopped, lastStreamId } = await discoverTvporiStreams(scrape_host, from, to, delay_ms, stop_after_errors, (p) => {
+          if (p.checked % 10 === 0 || p.ok) {
+            console.log(`🔎 [discover] ${hostKey} ${p.checked}/${p.total} — stream_id=${p.stream_id} ${p.ok ? '✅' : '❌'}`)
+          }
+        })
+        allResults[hostKey] = results
+        const alive = results.filter(r => r.ok).length
+        const reason = stopped ? `corte por ${stop_after_errors} errores consecutivos en stream_id=${lastStreamId}` : 'completado hasta el límite'
+        console.log(`🔎 [discover] ${hostKey} terminado: ${alive}/${results.length} vivos (${reason})`)
+      }
+      
+      // Guardar resultados en system_state para consulta posterior
+      try {
+        const json = JSON.stringify(allResults)
+        db.prepare(`INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES ('tvpori_discover_last', ?, ?)`)
+          .run(json, Date.now())
+        console.log(`🔎 [discover] Resultados guardados en system_state.tvpori_discover_last`)
+      } catch (e) {
+        console.error(`⚠️ [discover] Error guardando resultados:`, e.message)
+      }
+    })().catch(err => console.error('❌ [discover] Error:', err))
+  })
+
+  // GET /admin/tvpori/discover/last — devuelve el último resultado de descubrimiento
+  fastify.get('/admin/tvpori/discover/last', async () => {
+    const db = getDb()
+    const row = db.prepare(`SELECT value, updated_at FROM system_state WHERE key='tvpori_discover_last'`).get()
+    if (!row) return { available: false, message: 'No hay descubrimientos previos' }
+    
+    const results = JSON.parse(row.value)
+    const summary = {}
+    
+    // Para cada host, calcular: alive, dead, nuevos (no están en DB)
+    for (const [hostKey, items] of Object.entries(results)) {
+      const slug = hostKey === 'deportes' ? 'deportes' : 'regionales'
+      const aliveItems = items.filter(i => i.ok)
+      
+      // Marcar cuáles ya están en DB
+      const enriched = aliveItems.map(i => {
+        const externalId = `tvpori:${slug}:${i.stream_id}`
+        const existing = db.prepare(`SELECT id, name FROM channels WHERE external_id=?`).get(externalId)
+        return {
+          ...i,
+          external_id: externalId,
+          in_db: !!existing,
+          db_id: existing?.id || null,
+          db_name: existing?.name || null,
+        }
+      })
+      
+      summary[hostKey] = {
+        scanned: items.length,
+        alive: aliveItems.length,
+        in_db: enriched.filter(i => i.in_db).length,
+        new_to_db: enriched.filter(i => !i.in_db).length,
+        channels: enriched,
+      }
+    }
+    
+    return {
+      available: true,
+      updated_at: new Date(parseInt(row.updated_at)).toISOString(),
+      summary,
+    }
+  })
+
+  // GET /admin/tvpori/discover/pending?host=&page=&page_size=
+  // Lista filtrada de canales descubiertos PENDIENTES (no en DB, no skipped)
+  fastify.get('/admin/tvpori/discover/pending', async (req) => {
+    const db = getDb()
+    const { host = 'both', page = 1, page_size = 1 } = req.query || {}
+    const pageNum = Math.max(1, parseInt(page) || 1)
+    const pageSize = Math.max(1, parseInt(page_size) || 1)
+    
+    const row = db.prepare(`SELECT value FROM system_state WHERE key='tvpori_discover_last'`).get()
+    if (!row) return { available: false, message: 'No hay descubrimientos previos' }
+    
+    const allResults = JSON.parse(row.value)
+    const hostKeys = host === 'both' ? Object.keys(allResults) : [host]
+    
+    // Construir lista plana de pendientes (alive + no in_db + no skipped)
+    const skippedRows = db.prepare(`SELECT host, stream_id FROM tvpori_skipped`).all()
+    const skippedSet = new Set(skippedRows.map(r => `${r.host}:${r.stream_id}`))
+    
+    const pending = []
+    for (const hostKey of hostKeys) {
+      const slug = hostKey === 'deportes' ? 'deportes' : 'regionales'
+      const items = allResults[hostKey] || []
+      for (const item of items) {
+        if (!item.ok) continue
+        const externalId = `tvpori:${slug}:${item.stream_id}`
+        const existing = db.prepare(`SELECT id FROM channels WHERE external_id=?`).get(externalId)
+        if (existing) continue
+        if (skippedSet.has(`${hostKey}:${item.stream_id}`)) continue
+        pending.push({
+          host: hostKey,
+          stream_id: item.stream_id,
+          external_id: externalId,
+          url: item.url,
+        })
+      }
+    }
+    
+    const total = pending.length
+    const totalPages = Math.ceil(total / pageSize)
+    const start = (pageNum - 1) * pageSize
+    const items = pending.slice(start, start + pageSize)
+    
+    return {
+      available: true,
+      page: pageNum,
+      page_size: pageSize,
+      total,
+      total_pages: totalPages,
+      items,
+    }
+  })
+
+  // POST /admin/tvpori/skip-discovered
+  // Body: { host, stream_id, reason? }
+  fastify.post('/admin/tvpori/skip-discovered', async (req, reply) => {
+    const { host, stream_id, reason = '' } = req.body || {}
+    if (!host || stream_id === undefined) {
+      return reply.code(400).send({ error: 'host y stream_id requeridos' })
+    }
+    const db = getDb()
+    db.prepare(`INSERT OR REPLACE INTO tvpori_skipped (host, stream_id, reason, skipped_at) VALUES (?, ?, ?, datetime('now'))`)
+      .run(host, parseInt(stream_id), String(reason))
+    return { ok: true, host, stream_id }
+  })
+
+  // DELETE /admin/tvpori/skip-discovered/:host/:stream_id  (deshacer skip)
+  fastify.delete('/admin/tvpori/skip-discovered/:host/:stream_id', async (req) => {
+    const db = getDb()
+    db.prepare(`DELETE FROM tvpori_skipped WHERE host=? AND stream_id=?`)
+      .run(req.params.host, parseInt(req.params.stream_id))
+    return { ok: true }
+  })
+
+  // GET /admin/tvpori/fresh-url?host=&stream_id=
+  // Hace scrape FRESCO y devuelve la URL del stream (para preview)
+  fastify.get('/admin/tvpori/fresh-url', async (req, reply) => {
+    const { host, stream_id } = req.query || {}
+    if (!host || !stream_id) {
+      return reply.code(400).send({ error: 'host y stream_id requeridos' })
+    }
+    const hostMap = {
+      'deportes':   'deportes.ksdjugfsddeports.com',
+      'regionales': 'regionales.saohgdasregions.fun',
+    }
+    const scrape_host = hostMap[host]
+    if (!scrape_host) return reply.code(400).send({ error: 'host inválido' })
+
+    const ch = { scrape_host, stream_id: String(stream_id), db_name: `${host}_${stream_id}` }
+    const result = await scrapeTvporiChannel(ch)
+    if (!result.ok || !result.url) {
+      return reply.code(502).send({ error: `Scrape falló: ${result.error || 'sin URL'}` })
+    }
+    return { ok: true, url: result.url, expiresAt: result.expiresAt }
+  })
+
+  // POST /admin/tvpori/import-discovered
+  // Body: {
+  //   host: 'deportes' | 'regionales',
+  //   stream_id: number,
+  //   name?: string,           // default: '{host}_{stream_id}'
+  //   category_id?: number,
+  //   epg_id?: string,
+  //   logo?: string,
+  //   country?: string,
+  //   quality_label?: string,  // 'FHD' | 'HD' | 'SD' | 'Unknown'
+  // }
+  // Hace scrape FRESCO del stream_id y crea el canal con external_id.
+  fastify.post('/admin/tvpori/import-discovered', async (req, reply) => {
+    const { host, stream_id, name, category_id, epg_id, logo, country, quality_label } = req.body || {}
+    
+    if (!host || stream_id === undefined) {
+      return reply.code(400).send({ error: 'host y stream_id requeridos' })
+    }
+    
+    const hostMap = {
+      'deportes':   'deportes.ksdjugfsddeports.com',
+      'regionales': 'regionales.saohgdasregions.fun',
+    }
+    const scrape_host = hostMap[host]
+    if (!scrape_host) {
+      return reply.code(400).send({ error: `host inválido: ${host}` })
+    }
+    
+    const db = getDb()
+    const externalId = `tvpori:${host}:${stream_id}`
+    
+    // Verificar que no exista ya
+    const existing = db.prepare(`SELECT id, name FROM channels WHERE external_id=?`).get(externalId)
+    if (existing) {
+      return reply.code(409).send({ error: `Ya existe en DB`, channel: existing })
+    }
+    
+    // Scrape fresco
+    const sid = String(stream_id)
+    const channelInfo = { scrape_host, stream_id: sid, db_name: name || `${host}_${stream_id}` }
+    const scrapeResult = await scrapeTvporiChannel(channelInfo)
+    
+    if (!scrapeResult.ok || !scrapeResult.url) {
+      return reply.code(502).send({ error: `Scrape falló: ${scrapeResult.error || 'sin URL'}` })
+    }
+    
+    // Calcular stream_id correlativo nuevo (no confundir con tvpori stream_id)
+    const maxRow = db.prepare(`SELECT COALESCE(MAX(stream_id), 2000) as m FROM channels`).get()
+    const nextStreamId = (maxRow?.m || 2000) + 1
+    
+    // Resolver category_id: default según host
+    let catId = category_id || null
+    if (!catId) {
+      const defaultCatName = host === 'deportes' ? 'Deportes' : 'General'
+      const cat = db.prepare(`SELECT id FROM categories WHERE name=?`).get(defaultCatName)
+      catId = cat?.id || null
+    }
+    
+    // INSERT con external_id y datos opcionales
+    const channelName = name || `${host}_${stream_id}`
+    const result = db.prepare(`
+      INSERT INTO channels (
+        name, category_id, country, logo, epg_id, url_hd,
+        stream_id, enabled, source_id,
+        tvpori_host, tvpori_stream_id, tvpori_scraped_at,
+        external_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, datetime('now'), ?, datetime('now'), datetime('now'))
+    `).run(
+      channelName,
+      catId,
+      country || '',
+      logo || '',
+      epg_id || '',
+      scrapeResult.url,
+      nextStreamId,
+      scrape_host,
+      sid,
+      externalId
+    )
+    
+    // Invalidar cache M3U
+    invalidateM3UCache('import discovered')
+    
+    return {
+      ok: true,
+      channel: {
+        id: result.lastInsertRowid,
+        name: channelName,
+        external_id: externalId,
+        stream_id: nextStreamId,
+        url_hd: scrapeResult.url,
+        category_id: catId,
+        quality_label: quality_label || 'Unknown',
+      }
+    }
   })
 
   fastify.post('/admin/channels/bulk-auto-epg', async () => {

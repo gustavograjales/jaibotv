@@ -183,3 +183,64 @@ Cliente → GET /xmltv.php → devuelve XMLTV consolidado (~1.2s)
 | `fuse.js` | Búsqueda fuzzy EPG picker |
 | `fast-xml-parser` ^4.5.6 | Parser XMLTV |
 | `pm2` (global) | Process manager |
+
+
+---
+
+## Flujo Discover UI (agregado 2026-05-13)
+
+### Objetivo
+Permitir revisar e importar manualmente los canales tvpori descubiertos por el barrido masivo, con preview visual antes de decidir si importar o saltar.
+
+### Componentes
+┌──────────────────┐         ┌──────────────────────────┐
+│ scheduler        │         │ tvporiScraper            │
+│ (no toca         │         │   - scrapeAllTvporiChan  │
+│  discover, solo  │◄────────│   - discoverTvpori (new) │
+│  scrape normal)  │         │   - scrapeTvporiChannel  │
+└──────────────────┘         └──────────────────────────┘
+▲
+│ usado por
+│
+┌──────────────────┐         ┌──────────────────────────┐
+│ admin/discover   │         │ admin.js endpoints       │
+│   .html + .js    │◄────────│  /tvpori/discover/*      │
+│                  │  HTTP   │  /tvpori/skip-*          │
+│ - Card 1×1       │         │  /tvpori/import-*        │
+│ - hls.js preview │         │  /tvpori/fresh-url       │
+│ - Form import    │         └──────────────────────────┘
+└──────────────────┘                   │
+│                              │
+│ /live/{stream_id}.ts         ▼
+▼                       ┌─────────────────────┐
+┌──────────────────┐             │ DB: channels +      │
+│ xtream proxy     │             │ tvpori_skipped +    │
+│ (302 redirect    │             │ system_state        │
+│  al server real) │             └─────────────────────┘
+└──────────────────┘
+### Flujo de import
+
+1. Usuario navega a `/admin/discover.html`
+2. JS carga `/admin/tvpori/discover/pending?page=1&page_size=1`
+3. Card renderizada con form (nombre default = `{slug}_{stream_id}`)
+4. Click "▶️ Preview":
+   - JS hace `GET /admin/tvpori/fresh-url?host=&stream_id=` (scrape fresco)
+   - hls.js carga la URL con token nuevo
+   - Browser sale por IP pública del router (misma que el cliente IPTV final)
+   - Servidor remoto entrega el stream
+   - Al cargar el video, `videoWidth × videoHeight` define calidad (FHD/HD/SD)
+5. Usuario edita nombre/categoría/EPG/logo en el form
+6. Click "Importar":
+   - `POST /admin/tvpori/import-discovered` con todos los campos
+   - Endpoint hace OTRO scrape fresco internamente (token actualizado al momento del INSERT)
+   - INSERT en `channels` con `external_id = tvpori:{host}:{stream_id}`
+   - Retorna `{ ok, channel: { id, ... } }`
+7. JS avanza al siguiente pendiente automáticamente
+
+### Decisiones de diseño
+
+- **Card 1×1 (no grid):** evita saturar el server con N streams hls.js simultáneos
+- **Preview on-demand:** click necesario, no auto-load
+- **Scrape fresco en cada paso:** preview + import usan tokens nuevos (no caché)
+- **external_id estable:** scrapers periódicos actualizan solo URL, no machacan nombre/EPG/categoría asignados por el usuario
+- **Modelo simple (1 canal = 1 fuente):** refactor a channel_sources pospuesto a Fase 6 VPS
