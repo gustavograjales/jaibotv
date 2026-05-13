@@ -131,7 +131,9 @@ export async function scrapeAllTvporiChannels(onProgress = null) {
   for (const ch of TVPORI_CHANNELS) {
     const result = await scrapeTvporiChannel(ch)
     if (result.ok && result.url) {
-      const dbCh = db.prepare(`SELECT id FROM channels WHERE LOWER(name)=LOWER(?)`).get(ch.db_name)
+      const slug = ch.scrape_host.split('.')[0].toLowerCase()
+      const externalId = `tvpori:${slug}:${ch.stream_id}`
+      const dbCh = db.prepare(`SELECT id FROM channels WHERE external_id=?`).get(externalId)
       if (dbCh) {
         db.prepare(`UPDATE channels SET url_hd=?, tvpori_host=?, tvpori_stream_id=?, tvpori_scraped_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
           .run(result.url, ch.scrape_host, ch.stream_id, dbCh.id)
@@ -140,8 +142,8 @@ export async function scrapeAllTvporiChannels(onProgress = null) {
         const nextStreamId = (maxId?.m || 2000) + 1
         const catName = ch.scrape_host.includes('deportes') ? 'Deportes' : 'General'
         const cat = db.prepare(`SELECT id FROM categories WHERE name=?`).get(catName)
-        db.prepare(`INSERT INTO channels (name, category_id, url_hd, tvpori_host, tvpori_stream_id, tvpori_scraped_at, stream_id, enabled) VALUES (?,?,?,?,?,datetime('now'),?,1)`)
-          .run(ch.db_name, cat?.id || null, result.url, ch.scrape_host, ch.stream_id, nextStreamId)
+        db.prepare(`INSERT INTO channels (name, category_id, url_hd, tvpori_host, tvpori_stream_id, tvpori_scraped_at, stream_id, enabled, external_id) VALUES (?,?,?,?,?,datetime('now'),?,1,?)`)
+          .run(ch.db_name, cat?.id || null, result.url, ch.scrape_host, ch.stream_id, nextStreamId, externalId)
       }
       updated++
     } else {
@@ -161,7 +163,9 @@ export async function scrapeTvporiByName(dbName) {
   const result = await scrapeTvporiChannel(ch)
   if (result.ok && result.url) {
     const db = getDb()
-    const dbCh = db.prepare(`SELECT id FROM channels WHERE LOWER(name)=LOWER(?)`).get(dbName)
+    const slug = ch.scrape_host.split('.')[0].toLowerCase()
+    const externalId = `tvpori:${slug}:${ch.stream_id}`
+    const dbCh = db.prepare(`SELECT id FROM channels WHERE external_id=?`).get(externalId)
     if (dbCh) db.prepare(`UPDATE channels SET url_hd=?, tvpori_scraped_at=datetime('now'), updated_at=datetime('now') WHERE id=?`).run(result.url, dbCh.id)
   }
   return result
