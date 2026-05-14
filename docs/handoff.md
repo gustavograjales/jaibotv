@@ -60,6 +60,40 @@ cliente IPTV real.
 
 ---
 
+
+### Limpieza de categorías (final sesión 2026-05-14)
+
+Decisión: simplificar catálogo a 2 categorías para empezar validación limpia.
+
+**Operación SQL ejecutada (en transacción):**
+```sql
+-- Move 1: Deportes (29 canales) -> Por revisar
+UPDATE channels SET category_id=125 WHERE enabled=1 AND category_id=2;
+
+-- Move 2: 17 categorías diversas (137 canales) -> Undefined
+UPDATE channels SET category_id=109 
+WHERE enabled=1 AND category_id NOT IN (109, 125) AND category_id IS NOT NULL;
+```
+
+**Estado final del catálogo:**
+- 🔍 Por revisar (125): 952 canales (todos tvpori con anchor estable)
+- Undefined (109): 198 canales (de M3U externos, sin anchor)
+- Total activos: 1,150
+
+**Backup pre-limpieza:**
+`~/backups/db/iptv_pre-cat-cleanup_20260514_*.db`
+
+**Razonamiento:**
+- Los 29 canales de "Deportes" (DAZN F1, ESPN, FOX, etc.) ya tienen
+  nombre real y external_id correcto, pero se movieron a "Por revisar"
+  para validar todos los tvpori juntos desde IPTVX.
+- Las categorías raras (Entertainment, News, Religious, etc.) eran
+  auto-generadas del scraping M3U y estaban dispersas.
+- Después de validar, los canales que funcionen se moverán a sus
+  categorías reales (Deportes, Películas, Noticias, etc.) manualmente.
+
+---
+
 ## Sesión 2026-05-13 PM — Feature Discover UI (preview hls.js + import manual)
 
 ### Lo que se hizo
