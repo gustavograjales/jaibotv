@@ -410,6 +410,154 @@ export default async function adminRoutes(fastify) {
     }
   })
 
+  // POST /admin/tvpori/import-all-pending
+  // Body: { category_id: number, delay_ms?: number, host?: 'both'|'deportes'|'regionales' }
+  // Importa TODOS los canales pendientes con nombres tvpori-DEP-NNN / tvpori-REG-NNN.
+  // Asíncrono: responde inmediato y corre en background.
+  fastify.post('/admin/tvpori/import-all-pending', async (req, reply) => {
+    const { category_id, delay_ms = 1200, host = 'both' } = req.body || {}
+    if (!category_id) {
+      return reply.code(400).send({ error: 'category_id requerido (usa la categoría "Por revisar")' })
+    }
+    
+    const db = getDb()
+    
+    // Validar categoría
+    const cat = db.prepare(`SELECT id, name FROM categories WHERE id=?`).get(parseInt(category_id))
+    if (!cat) {
+      return reply.code(400).send({ error: `Categoría id=${category_id} no existe` })
+    }
+    
+    // Obtener lista de pendientes desde system_state
+    const row = db.prepare(`SELECT value FROM system_state WHERE key='tvpori_discover_last'`).get()
+    if (!row) {
+      return reply.code(400).send({ error: 'No hay descubrimientos previos. Lanza /admin/tvpori/discover primero.' })
+    }
+    
+    const allResults = JSON.parse(row.value)
+    const hostKeys = host === 'both' ? Object.keys(allResults) : [host]
+    
+    // Construir lista de pendientes (alive + no in_db + no skipped)
+    const skippedRows = db.prepare(`SELECT host, stream_id FROM tvpori_skipped`).all()
+    const skippedSet = new Set(skippedRows.map(r => `${r.host}:${r.stream_id}`))
+    
+    const pending = []
+    for (const hostKey of hostKeys) {
+      const items = allResults[hostKey] || []
+      for (const item of items) {
+        if (!item.ok) continue
+        const externalId = `tvpori:${hostKey}:${item.stream_id}`
+        const existing = db.prepare(`SELECT id FROM channels WHERE external_id=?`).get(externalId)
+        if (existing) continue
+        if (skippedSet.has(`${hostKey}:${item.stream_id}`)) continue
+        pending.push({ host: hostKey, stream_id: item.stream_id, externalId })
+      }
+    }
+    
+    // Responder inmediato
+    reply.send({
+      status: 'importing',
+      total: pending.length,
+      category: cat.name,
+      delay_ms,
+      estimated_minutes: Math.ceil(pending.length * delay_ms / 60000),
+    })
+    
+    // Ejecutar en background
+    ;(async () => {
+      const hostMap = {
+        'deportes':   'deportes.ksdjugfsddeports.com',
+        'regionales': 'regionales.saohgdasregions.fun',
+      }
+      
+      let imported = 0
+      let failed = 0
+      const startTime = Date.now()
+      console.log(`🚀 [bulk-import] Iniciando importación masiva: ${pending.length} canales en categoría "${cat.name}" (delay ${delay_ms}ms)`)
+      
+      for (let i = 0; i < pending.length; i++) {
+        const { host: hostKey, stream_id, externalId } = pending[i]
+        const scrape_host = hostMap[hostKey]
+        const prefix = hostKey === 'deportes' ? 'DEP' : 'REG'
+        const padded = String(stream_id).padStart(3, '0')
+        const channelName = `tvpori-${prefix}-${padded}`
+        
+        try {
+          // Verificar de nuevo (puede haberse importado mientras tanto)
+          const exists = db.prepare(`SELECT id FROM channels WHERE external_id=?`).get(externalId)
+          if (exists) {
+            console.log(`⏭️  [bulk-import] ${i+1}/${pending.length} ${channelName} ya existe (id ${exists.id})`)
+            continue
+          }
+          
+          // Scrape fresco
+          const channelInfo = { scrape_host, stream_id: String(stream_id), db_name: channelName }
+          const result = await scrapeTvporiChannel(channelInfo)
+          
+          if (!result.ok || !result.url) {
+            console.warn(`❌ [bulk-import] ${i+1}/${pending.length} ${channelName} scrape falló: ${result.error}`)
+            failed++
+            continue
+          }
+          
+          // Calcular nuevo stream_id correlativo
+          const maxRow = db.prepare(`SELECT COALESCE(MAX(stream_id), 2000) as m FROM channels`).get()
+          const nextStreamId = (maxRow?.m || 2000) + 1
+          
+          // INSERT
+          db.prepare(`
+            INSERT INTO channels (
+              name, category_id, country, logo, epg_id, url_hd,
+              stream_id, enabled, source_id,
+              tvpori_host, tvpori_stream_id, tvpori_scraped_at,
+              external_id, created_at, updated_at
+            ) VALUES (?, ?, '', '', '', ?, ?, 1, NULL, ?, ?, datetime('now'), ?, datetime('now'), datetime('now'))
+          `).run(channelName, cat.id, result.url, nextStreamId, scrape_host, String(stream_id), externalId)
+          
+          imported++
+          
+          if ((i+1) % 25 === 0 || i+1 === pending.length) {
+            const elapsed = Math.round((Date.now() - startTime) / 1000)
+            const rate = (i+1) / elapsed
+            const remaining = Math.round((pending.length - (i+1)) / rate)
+            console.log(`📦 [bulk-import] ${i+1}/${pending.length} (${imported} OK, ${failed} fail) — ${elapsed}s elapsed, ~${remaining}s restantes`)
+          }
+        } catch (e) {
+          console.error(`❌ [bulk-import] ${i+1}/${pending.length} ${channelName}: ${e.message}`)
+          failed++
+        }
+        
+        if (i < pending.length - 1) await new Promise(r => setTimeout(r, delay_ms))
+      }
+      
+      const elapsed = Math.round((Date.now() - startTime) / 1000)
+      console.log(`✅ [bulk-import] COMPLETADO: ${imported} importados, ${failed} fallidos en ${elapsed}s`)
+      
+      // Guardar resultado en system_state
+      try {
+        db.prepare(`INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES ('tvpori_bulk_import_last', ?, ?)`)
+          .run(JSON.stringify({ imported, failed, total: pending.length, elapsed_sec: elapsed, completed_at: new Date().toISOString() }), Date.now())
+      } catch (e) {
+        console.error(`⚠️ Error guardando resultado bulk-import:`, e.message)
+      }
+      
+      // Invalidar cache M3U
+      invalidateM3UCache('bulk import tvpori')
+    })().catch(err => console.error('❌ [bulk-import] error fatal:', err))
+  })
+
+  // GET /admin/tvpori/import-all-pending/status — ver estado/resultado del último bulk
+  fastify.get('/admin/tvpori/import-all-pending/status', async () => {
+    const db = getDb()
+    const row = db.prepare(`SELECT value, updated_at FROM system_state WHERE key='tvpori_bulk_import_last'`).get()
+    if (!row) return { available: false, message: 'No hay bulk-import previo' }
+    return {
+      available: true,
+      result: JSON.parse(row.value),
+      updated_at: new Date(parseInt(row.updated_at)).toISOString(),
+    }
+  })
+
   fastify.post('/admin/channels/bulk-auto-epg', async () => {
     const db = getDb()
     const channels = db.prepare(`SELECT * FROM channels WHERE (epg_id IS NULL OR epg_id='') AND enabled=1`).all()

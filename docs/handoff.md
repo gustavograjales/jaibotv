@@ -1,6 +1,65 @@
 # Handoff técnico — JaiboTV
 
 
+
+## Sesión 2026-05-14 — Importación masiva tvpori (922 canales)
+
+### Hallazgo crítico al iniciar
+- Server tvpori cambió validación HTTP: requests con headers básicos
+  (curl/Python/browser) reciben 403 al consumir .m3u8
+- streamChecker funciona porque envía Range headers (HTTP 206)
+- Cliente IPTV (IPTVX/TiviMate) sigue funcionando perfectamente
+- DAZN F1 confirmado funcional en IPTVX → sistema OK, solo Discover UI con preview hls.js queda inválido
+
+### Decisión: Importación masiva sin preview
+- En vez de validar uno por uno con preview admin, importar todos los
+  922 pendientes y validar desde cliente IPTV (IPTVX en iPhone)
+
+### Cambios implementados
+1. **Categoría nueva**: `🔍 Por revisar` (id=125, sort_order=99)
+2. **Endpoint nuevo**: `POST /admin/tvpori/import-all-pending`
+   - Body: `{ category_id, delay_ms?: 1200, host?: 'both' }`
+   - Asíncrono, responde inmediato y corre en background
+   - Itera pendientes (alive + no in_db + no skipped)
+   - Scrape fresco por canal + INSERT con external_id estable
+   - Naming: `tvpori-DEP-NNN` / `tvpori-REG-NNN` (padding 3 dígitos)
+   - Log de progreso cada 25 canales
+3. **Endpoint nuevo**: `GET /admin/tvpori/import-all-pending/status`
+   - Devuelve resultado del último bulk import
+
+### Resultado de la importación
+✅ 922/922 importados (100% éxito, 0 fallidos)
+⏱️  26.6 minutos (1599s)
+📊 Catálogo final: 1,151 canales activos
+- 921 en "🔍 Por revisar" (pendientes de validar)
+- 992 con anchor tvpori estable
+- 160 canales de otras fuentes (M3U)
+### Workflow de validación pendiente
+
+Para próximas sesiones, el flujo es:
+1. Refrescar IPTVX → ver categoría "🔍 Por revisar"
+2. Probar canales por tandas (ej: DEP-001 a DEP-050)
+3. Para cada uno:
+   - Funciona → admin web → renombrar + categorizar + asignar EPG/logo
+   - No funciona → deshabilitar (`enabled=0`)
+4. Cuando "Por revisar" quede vacía, la categoría se puede eliminar
+
+### Estado al cierre
+- PM2 jaibotv: online, ~18 MB
+- DB con 1,151 canales activos, 992 con anchor estable
+- Commit pendiente del endpoint bulk-import
+- Pendiente principal: validación manual de 921 canales desde IPTVX
+
+### Limitación documentada (BUG-16 actualizado)
+El server tvpori valida algo específico del cliente que solo cliente IPTV
+real (TiviMate/IPTVX) puede satisfacer. curl/Python/browser/hls.js reciben
+403 al consumir .m3u8. streamChecker funciona porque usa Range requests.
+**Implicación:** Discover UI con preview hls.js queda inválido hasta que
+el server cambie política. Workaround: importar a ciegas + validar en
+cliente IPTV real.
+
+---
+
 ## Sesión 2026-05-13 PM — Feature Discover UI (preview hls.js + import manual)
 
 ### Lo que se hizo
