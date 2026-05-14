@@ -55,6 +55,90 @@ Cambiar la búsqueda por nombre a búsqueda por `(tvpori_host, tvpori_stream_id)
 - **Arreglar caso ambiguo regionales/51** — mismo stream_id asociado a nombres distintos en tvpori (Estrella TV vs Universal Cinema)
 
 ---
+### Mejoras al panel admin — Gestión de catálogo ⏳
+
+Originadas del análisis comparativo con m3u4u.com (sesión 2026-05-14).
+Necesarias para el flujo de depuración de los 921 canales "Por revisar".
+
+#### Panel de Categorías (nueva sección en admin UI)
+
+El API REST ya existe (`/admin/categories` GET/POST/PUT/DELETE).
+Solo falta la UI. Implementar pantalla dedicada con:
+
+- Lista de categorías con nombre, icono, `sort_order` y conteo de canales
+- Crear categoría nueva (nombre + icono emoji + orden)
+- Editar categoría (nombre, icono, orden)
+- Eliminar categoría (solo si `channel_count = 0`, o con confirmación de reasignación)
+- Reordenar via drag & drop que actualice `sort_order` en DB
+
+**Backend necesario:** endpoint `PUT /admin/categories/:id/reorder` o
+actualización del `sort_order` via el PUT existente.
+
+#### Toggle enabled/disabled por canal (desde tabla de canales)
+
+El campo `enabled` existe en DB pero no está expuesto en la UI.
+Agregar toggle visual (switch o botón) en la fila de la tabla,
+sin necesidad de abrir el modal de edición.
+
+**Caso de uso inmediato:** durante la depuración de los 921 canales
+"Por revisar", el flujo es: pruebo en IPTVX → no funciona → lo
+deshabilito desde el admin sin borrarlo.
+
+**Backend necesario:** endpoint `PATCH /admin/channels/:id/enabled`
+(o reutilizar el PUT existente).
+
+#### Selección múltiple de canales + acciones masivas
+
+Checkboxes en la tabla de canales para selección individual y
+"seleccionar todo en página". Barra de acciones que aparece al
+seleccionar ≥1 canal:
+
+- **Mover a categoría** → dropdown de categorías → aplica a todos los seleccionados
+- **Habilitar todos** los seleccionados
+- **Deshabilitar todos** los seleccionados
+- **Eliminar todos** los seleccionados (con confirmación)
+
+**Backend necesario:** endpoints bulk:
+- `POST /admin/channels/bulk-update` — body: `{ ids[], category_id?, enabled? }`
+- `POST /admin/channels/bulk-delete` — body: `{ ids[] }`
+
+#### Sorting de la tabla de canales
+
+Click en headers de columna para ordenar. Columnas ordenables:
+nombre, categoría, EPG ID, calidad.
+
+**Decisión pendiente antes de implementar:** ¿frontend-only (ordena
+solo la página visible) o backend (parámetro `sort` en el query
+`GET /admin/channels`)?
+
+Recomendación: backend, para que el orden sea consistente con la
+paginación. Costo: un parámetro extra en el endpoint.
+
+---
+
+#### Merge / deduplicación de canales
+
+Para canales con mismo nombre, mismo contenido, misma calidad pero
+diferente URL (caso frecuente durante la depuración masiva tvpori):
+
+**Opción A — Deduplicación simple (corto plazo):**
+- Vista comparativa: dos canales lado a lado con sus metadatos
+- Acción "fusionar": conserva uno, transfiere metadatos útiles
+  (EPG ID, logo, nombre custom) y elimina el duplicado
+- Implementable sin cambios de schema
+
+**Opción B — Multi-source por canal (Fase 6 / VPS):**
+- Tabla `channel_sources` (ya documentada en roadmap Fase 6)
+- Un canal lógico → múltiples URLs fuente con prioridad y failover
+- El merge deja de ser "borrar uno" y pasa a ser "agregar source"
+
+**Estado:** Opción A puede implementarse post-depuración si los
+duplicados resultan ser un problema frecuente. Opción B está
+comprometida a Fase 6.
+
+**No implementar hasta terminar la depuración** y medir cuántos
+duplicados reales existen en los 921 canales importados.
+
 ## Fases del proyecto
 
 ### Fase 1 ✅ — Backend base
