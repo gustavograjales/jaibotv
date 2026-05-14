@@ -94,6 +94,66 @@ WHERE enabled=1 AND category_id NOT IN (109, 125) AND category_id IS NOT NULL;
 
 ---
 
+
+### Actualización masiva desde Excel (final sesión 2026-05-14)
+
+Después del bulk-import + limpieza de categorías, Gustavo trabajó manualmente
+(entre interacciones con Claude) en la validación de canales desde IPTVX:
+
+1. Probó ~952 canales tvpori desde IPTVX
+2. Renombró ~235 canales de `tvpori-NNN` a sus nombres reales
+3. Eliminó físicamente ~677 canales sin señal (no deshabilitados, borrados)
+4. Marcó ~40 canales con sufijo `-OK` como pendientes de renombrar
+5. Exportó listado de DB a Excel con columnas: Canal, Categoría, País
+6. Categorizó manualmente 332 canales en 15 categorías
+7. Asignó código de país (11 países: MX, US, ES, AR, PE, CO, CL, DE, CR, PY, VE)
+
+**Update masivo desde Excel ejecutado:**
+- Script: `/tmp/apply_excel_update.py --apply`
+- Backup pre-update: `~/backups/db/iptv_pre-excel-update_20260514_*.db`
+- Match: 330/330 nombres del Excel matchean exactamente con DB (100%)
+- Filas actualizadas: 391 (más que 330 por canales con nombres duplicados)
+- 4 categorías nuevas creadas: Regionales MX, Cultura, Religioso, Clima
+
+**Estado final del catálogo:**
+Categoría              Canales
+─────────────────────────────────
+Noticias                 14
+Deportes                 83
+Entretenimiento          21
+Películas                47
+Series                   20
+Infantil                 11
+Documentales             18
+Música                   10
+Internacionales          20
+General                  19
+Cultura                  19
+Regionales MX           100
+Religioso                 2
+Clima                     1
+Adultos                   7
+🔍 Por revisar          80  (tvpori-NNN aún pendientes)
+Undefined                 1
+─────────────────────────────────
+Total activos:          473
+**Distribución por país:**
+- MX: 219 canales
+- US: 126 canales
+- ES: 16 canales
+- AR: 11 canales
+- Otros (PE/CO/CL/DE/VE/PY/PR/CR): 16 canales
+
+### Pendientes para próxima sesión
+
+1. **Renombrar los 80 tvpori-NNN restantes** que están con sufijo -OK
+   (significa que ya se validaron en IPTVX y solo falta asignarles nombre/categoría)
+2. **Revisar el 1 canal en "Undefined"** (verificar qué es y categorizar)
+3. **Eliminar la categoría "Por revisar"** una vez vacía
+4. Refactor channel_sources para failover real (Fase 6 VPS)
+
+---
+
 ## Sesión 2026-05-13 PM — Feature Discover UI (preview hls.js + import manual)
 
 ### Lo que se hizo
