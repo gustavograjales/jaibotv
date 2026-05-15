@@ -126,34 +126,41 @@ export async function scrapeAllTvporiChannels(onProgress = null) {
   try { db.exec(`ALTER TABLE channels ADD COLUMN tvpori_host TEXT DEFAULT ''`) } catch (e) {}
   try { db.exec(`ALTER TABLE channels ADD COLUMN tvpori_stream_id TEXT DEFAULT ''`) } catch (e) {}
   try { db.exec(`ALTER TABLE channels ADD COLUMN tvpori_scraped_at TEXT`) } catch (e) {}
+
+  // Iterar TODOS los canales tvpori activos de la DB (no solo TVPORI_CHANNELS hardcoded)
+  // Esto refresca tokens de canales bulk-importados, renombrados, recategorizados, etc.
+  const dbChannels = db.prepare(`
+    SELECT id, name, tvpori_host, tvpori_stream_id
+    FROM channels
+    WHERE enabled=1 AND tvpori_host != '' AND tvpori_stream_id != ''
+    ORDER BY id
+  `).all()
+
   const results = []
   let updated = 0, failed = 0
-  for (const ch of TVPORI_CHANNELS) {
-    const result = await scrapeTvporiChannel(ch)
+
+  for (const dbCh of dbChannels) {
+    // Construir objeto compatible con scrapeTvporiChannel (espera { scrape_host, stream_id })
+    const channelInput = { scrape_host: dbCh.tvpori_host, stream_id: dbCh.tvpori_stream_id }
+    const result = await scrapeTvporiChannel(channelInput)
+
     if (result.ok && result.url) {
-      const slug = ch.scrape_host.split('.')[0].toLowerCase()
-      const externalId = `tvpori:${slug}:${ch.stream_id}`
-      const dbCh = db.prepare(`SELECT id FROM channels WHERE external_id=?`).get(externalId)
-      if (dbCh) {
-        db.prepare(`UPDATE channels SET url_hd=?, tvpori_host=?, tvpori_stream_id=?, tvpori_scraped_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
-          .run(result.url, ch.scrape_host, ch.stream_id, dbCh.id)
-      } else {
-        const maxId = db.prepare(`SELECT COALESCE(MAX(stream_id),2000) as m FROM channels`).get()
-        const nextStreamId = (maxId?.m || 2000) + 1
-        const catName = ch.scrape_host.includes('deportes') ? 'Deportes' : 'General'
-        const cat = db.prepare(`SELECT id FROM categories WHERE name=?`).get(catName)
-        db.prepare(`INSERT INTO channels (name, category_id, url_hd, tvpori_host, tvpori_stream_id, tvpori_scraped_at, stream_id, enabled, external_id) VALUES (?,?,?,?,?,datetime('now'),?,1,?)`)
-          .run(ch.db_name, cat?.id || null, result.url, ch.scrape_host, ch.stream_id, nextStreamId, externalId)
-      }
+      // UPDATE por id de DB (el id es el ancla, external_id ya esta fijado)
+      db.prepare(`
+        UPDATE channels
+        SET url_hd=?, tvpori_scraped_at=datetime('now'), updated_at=datetime('now')
+        WHERE id=?
+      `).run(result.url, dbCh.id)
       updated++
     } else {
       failed++
     }
-    results.push(result)
-    if (onProgress) onProgress({ checked: results.length, total: TVPORI_CHANNELS.length, channel: ch.db_name, ok: result.ok })
+    results.push({ ...result, name: dbCh.name })
+    if (onProgress) onProgress({ checked: results.length, total: dbChannels.length, channel: dbCh.name, ok: result.ok })
     await new Promise(r => setTimeout(r, 1200))
   }
-  console.log(`✅ tvpori scrape: ${updated} actualizados, ${failed} fallidos de ${TVPORI_CHANNELS.length}`)
+
+  console.log(`✅ tvpori scrape: ${updated} actualizados, ${failed} fallidos de ${dbChannels.length}`)
   return results
 }
 

@@ -1,4 +1,20 @@
-# Arquitectura — JaiboTV
+# Arquitectura
+
+## Update 2026-05-15
+
+### `scrapeAllTvporiChannels()` ahora itera la DB
+Antes: iteraba `TVPORI_CHANNELS` (array hardcoded de 69 canales). Después: `SELECT FROM channels WHERE enabled=1 AND tvpori_host != ''` (315 canales activos). UPDATE por `id`. NO crea canales (esa responsabilidad es de import/discover, no de refresh).
+
+### external_id como ancla del canal
+El `external_id` es la columna ancla estable. Los scrapes refrescan URLs identificando el canal por su external_id (en bulk-import e import-csv) o por `id` de DB (en cron refresh). Nombres, categorías y metadatos son mutables sin afectar el ancla.
+
+Formatos:
+- `tvpori:{host_slug}:{stream_id}` ✅ implementado
+- `tvtv:{stream_param}` ✅ implementado 2026-05-15
+- `m3u:{source_id}:{tvg-id}` — pendiente patch aggregator.js (lunes 18-may)
+- `m3u:{source_id}:url:{sha1_8}` — pendiente patch aggregator.js (lunes 18-may)
+
+ — JaiboTV
 
 ## Visión general
 

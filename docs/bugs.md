@@ -1,4 +1,18 @@
-# Bugs activos y lecciones aprendidas
+# Bugs
+
+## Update 2026-05-15
+
+### Bug #13 — neutralizado en flujo de refresh tvpori
+El refactor de `scrapeAllTvporiChannels()` (cron 3.5h) ahora itera la DB y hace UPDATE por `id`. Esto **NO puede crear duplicados**. El bug sigue activo en:
+- `scrapeTvporiByName()` (admin web "scrape one by name")
+- Bulk-import desde `/admin/tvpori/import-all-pending`
+
+Fix definitivo (matching por `tvpori_host + tvpori_stream_id`) sigue pendiente para esos dos caminos.
+
+### Bug #13-equivalente en tvtvScraper — resuelto en código
+El scraper de tvtv también hacía match por `LOWER(name)=LOWER(?)`. Patch de 2026-05-15 cambió a match prioritario por external_id. **Cuando regresen canales tvtv (via import-csv), entrarán con external_id desde día 1.**
+
+ activos y lecciones aprendidas
 
 > Bugs numerados secuencialmente desde el inicio del proyecto.
 > Los resueltos quedan tachados con fecha de resolución.

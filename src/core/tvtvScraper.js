@@ -1,5 +1,6 @@
 // src/core/tvtvScraper.js — scraper de playbackURL de tvtvhd.com
 import { getDb } from '../db/schema.js'
+import { computeExternalId } from './externalId.js'
 
 const BASE_URL = 'https://tvtvhd.com/vivo/canales.php?stream='
 const TOKEN_DURATION_MS = 5 * 60 * 60 * 1000  // ~5 horas de margen
@@ -121,23 +122,33 @@ export async function importTvtvCsv(csvUrl) {
   const maxId = db.prepare(`SELECT COALESCE(MAX(stream_id),1000) as m FROM channels`).get()
   let nextId = (maxId?.m || 1000) + 1
 
-  for (let i = 1; i < lines.length; i++) {
+for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',')
     if (cols.length < 2) continue
-    const name       = cols[nameIdx]?.trim()
+    const name        = cols[nameIdx]?.trim()
     const streamParam = cols[paramIdx]?.trim()
-    const pageUrl    = cols[urlIdx]?.trim()
+    const pageUrl     = cols[urlIdx]?.trim()
     if (!name || !streamParam) continue
 
-    const existing = db.prepare(`SELECT id FROM channels WHERE LOWER(name)=LOWER(?)`).get(name)
+    const externalId = computeExternalId({ stream_param: streamParam })
+
+    // Match prioritario por external_id; fallback a name solo para canales legacy sin external_id
+    const existing =
+      db.prepare(`SELECT id FROM channels WHERE external_id=?`).get(externalId) ||
+      db.prepare(`SELECT id FROM channels WHERE LOWER(name)=LOWER(?) AND (external_id IS NULL OR external_id='')`).get(name)
+
     if (existing) {
-      db.prepare(`UPDATE channels SET stream_param=? WHERE id=?`).run(streamParam, existing.id)
+      db.prepare(`
+        UPDATE channels
+        SET stream_param=?, external_id=COALESCE(NULLIF(external_id,''), ?), updated_at=datetime('now')
+        WHERE id=?
+      `).run(streamParam, externalId, existing.id)
       updated++
     } else {
       db.prepare(`
-        INSERT INTO channels (name, category_id, stream_param, url_hd, stream_id, enabled)
-        VALUES (?, ?, ?, '', ?, 1)
-      `).run(name, deportesCat.id, streamParam, nextId++)
+        INSERT INTO channels (name, category_id, stream_param, url_hd, stream_id, enabled, external_id, updated_at)
+        VALUES (?, ?, ?, '', ?, 1, ?, datetime('now'))
+      `).run(name, deportesCat.id, streamParam, nextId++, externalId)
       added++
     }
   }

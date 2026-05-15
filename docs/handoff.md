@@ -1,5 +1,125 @@
 # Handoff técnico — JaiboTV
 
+## Sesión 2026-05-15 (viernes) — pre-mudanza
+
+### Tipo de sesión
+Implementación external_id tvtv + refactor scrape tvpori DB-driven + update masivo 41 canales + checklist pre-mudanza.
+
+### Qué se hizo
+
+1. **Bloque B-tvtv completado: external_id extendido a tvtv**
+   - `src/core/externalId.js` extendido con ramas `tvtv:{stream_param}`, `m3u:{source_id}:{tvg_id}` y `m3u:{source_id}:url:{sha1_8}` + helpers `normalizeUrl` y `sha1_8`
+   - `src/core/tvtvScraper.js` con match prioritario por external_id + fallback por nombre solo si external_id legacy vacío
+   - Bug equivalente al #13 en tvtvScraper (matching por nombre case-insensitive) queda neutralizado en el nuevo flujo
+   - 0 canales tvtv en DB hoy (eliminados en limpieza del 14-may), por lo que NO hay migración pendiente
+   - Próximo import-csv tvtv (manual cuando aplique) los traerá con external_id desde día 1
+
+2. **Bloque B-m3u POSPUESTO al lunes 18-may post-mudanza**
+   - aggregator.js NO modificado hoy. 158 canales M3U siguen sin external_id
+   - El cron M3U es semanal (próximo trigger: 21-may), no hay urgencia
+   - Lunes: aplicar el mismo patrón a aggregator.js + script de migración explícito de los 158
+
+3. **Refactor mayor: `scrapeAllTvporiChannels()` ahora itera la DB, no TVPORI_CHANNELS hardcoded**
+   - Antes: iteraba el array de 69 canales hardcoded en código → tokens stale en los 246 del bulk-import
+   - Después: `SELECT FROM channels WHERE tvpori_host != '' AND tvpori_stream_id != ''` → 315 canales
+   - UPDATE por `id` de DB (no por external_id ni por nombre) → no puede crear duplicados, neutraliza Bug #13 en el flujo de refresh
+   - Bloque INSERT eliminado del cron (refresh NO crea canales, eso es trabajo de import/discover)
+   - TVPORI_CHANNELS se conserva como catálogo histórico, lo sigue usando `scrapeTvporiByName()`
+
+4. **Scrape masivo en producción: 315/315 actualizados en ~11 min, 0 fallidos**
+   - Disparado vía `POST /admin/tvpori/scrape` tras el refactor
+   - Todos los tokens frescos al cierre, válidos ~4h
+
+5. **Update masivo de 41 canales desde Excel categorizado**
+   - Script `/tmp/apply_excel_update.py` con dry-run + apply + backup automático
+   - Match por id, validación sanity check con external_id esperado
+   - Distribución final: 24 Internacionales + 6 Películas + 3 Series + 2 Noticias + 2 Documentales + 2 General + 1 Deportes + 1 Infantil
+   - Categoría 🔍 Por revisar bajó de 82 → 31
+
+6. **Pre-mudanza completado**
+   - Network state capturado en `~/network-pre-mudanza.txt`
+   - Backup DB en `~/backups/db/iptv_pre-mudanza_20260515_142618.db`
+   - Backup proyecto en `~/backups/iptv-server-pre-mudanza-20260515_142623.tar.gz`
+   - Papelito mudanza en `~/papelito-mudanza.txt`
+   - Hallazgo: el servidor está en **WiFi (wlp0s20f3), no cable**. MAC: 70:9C:D1:17:95:58
+   - Hallazgo: contenedor docker `epg-iptv-org` (puerto 5000) corriendo 8 días, NO está siendo consumido por ningún `epg_sources`. Huérfano. Evaluar apagar post-mudanza.
+
+### Cifras al cierre (verificadas)
+
+| Métrica | Valor |
+|---|---|
+| Canales activos | 473 |
+| Con external_id | 315 (todos tvpori) |
+| Sin external_id | 158 (M3U pendientes lunes) |
+| Scrape tvpori último | 315/315 OK (12:48 CST) |
+| Por revisar restantes | 31 |
+| PM2 jaibotv | online, 144 MB, uptime 2h |
+| Docker huérfano | epg-iptv-org (8d uptime, sin consumo) |
+| Disco | 7% usado |
+
+### Archivos modificados (código fuente)
+
+- `src/core/externalId.js` (reemplazo completo)
+- `src/core/tvtvScraper.js` (import + reemplazo del bloque for con match-by-external_id)
+- `src/core/tvporiScraper.js` (reemplazo de `scrapeAllTvporiChannels` para iterar DB)
+
+### Decisiones tomadas
+
+| Decisión | Razón |
+|---|---|
+| B-m3u pospuesto al lunes | Cron M3U semanal corre 21-may, no hay urgencia, mantener cronograma de mudanza |
+| Cloudflare Tunnel pospuesto al sábado | Token de Claude al 73%, mantener foco en docs + commit antes del apagado |
+| WiFi en oficina y en casa | El servidor ya está en WiFi (wlp0s20f3), no hay tiempo de cambiar a cable hoy |
+| Subdominio `tv.myalpha.fit` (no comprar dominio) | Dominio myalpha.fit ya disponible. Subdominio cumple sin costo adicional |
+| UPDATE por id en refresh tvpori | Match físico simple, no puede crear duplicados, neutraliza Bug #13 en este flujo |
+| Refresh NO crea canales | Refresh y discovery son responsabilidades distintas. Refresh solo refresca URLs |
+| Mantener TVPORI_CHANNELS como referencia | Lo usa `scrapeTvporiByName()` y vale como catálogo histórico/bootstrap |
+| Docker epg-iptv-org se queda corriendo hoy | Aunque huérfano, lleva 8 días estable. Decidir en casa si apagar |
+
+### Bugs nuevos / cerrados
+
+- **Bug #13 (duplicados tvpori en scrape):** sin cerrar formalmente, pero **neutralizado en el flujo de refresh tvpori** gracias al refactor (UPDATE por id no puede crear duplicados). El bug sigue activo en `scrapeTvporiByName()` y en el bulk-import desde discover, pero el cron de las 3.5h ya no lo activa.
+- **Bug #13-equivalente en tvtvScraper:** identificado durante la sesión (match por `LOWER(name)=LOWER(?)`). Resuelto en el patch de tvtvScraper.js al introducir match-by-external_id como prioritario.
+- **No hay bugs nuevos.**
+
+### Patches con errores históricos (lecciones reforzadas)
+
+- Primer intento de patch via script Python falló por escapes incorrectos (`\n` literal). Tuvo rollback total via `git checkout HEAD`. Versión correcta del patch (script bash + nano + Python embebido sin escapes complejos) funcionó al segundo intento. **Reafirma lección crítica #1 del CLAUDE.md: heredocs y escapes complejos en SSH son frágiles. Preferir archivos simples a disco.**
+
+### Siguiente sesión recomendada
+
+**Sábado 16-may (en casa, post-mudanza):**
+
+1. Verificar arranque del servidor en red 192.168.100.x (WiFi del Huawei HG8145V5)
+2. Reservar IP estática por MAC `70:9C:D1:17:95:58` en panel del router Totalplay
+3. Actualizar `config.js` (SERVER_IP) si la IP cambia respecto a 192.168.1.250
+4. Verificar `pm2 status`, `curl localhost:3000/health`, `docker ps`
+5. **Cloudflare Tunnel**: instalar `cloudflared`, configurar túnel, DNS records `tv.myalpha.fit` y opcionalmente `admin.tv.myalpha.fit`, `ssh.tv.myalpha.fit`
+6. Validar streaming desde 4G iPhone (fuera de la red local)
+
+**Lunes 18-may:**
+
+7. Aplicar patch aggregator.js (B-m3u pospuesto): mismo patrón de match-by-external_id
+8. Script de migración explícito para los 158 canales M3U sin external_id
+9. Validar los 31 tvpori restantes en "Por revisar" si los identificas desde IPTVX
+
+### Backups creados en esta sesión
+~/backups/db/iptv_pre-sesion-15mayo_20260515_104304.db
+~/backups/pre-externalId-tvtv-20260515_111828/
+~/backups/db/iptv_pre-scrape-15mayo_20260515_113119.db
+~/backups/pre-tvpori-refactor-20260515_123702/
+~/backups/db/iptv_pre-excel-update_20260515_142352.db
+~/backups/db/iptv_pre-mudanza_20260515_142618.db
+~/backups/iptv-server-pre-mudanza-20260515_142623.tar.gz
+~/network-pre-mudanza.txt
+~/papelito-mudanza.txt
+
+### Último commit antes de esta sesión
+f373e7e (HEAD -> main, origin/main) docs: roadmap actualizado — sesión 2026-05-14
+---
+
+
+
 
 
 ## Sesión 2026-05-14 — Importación masiva tvpori (922 canales)

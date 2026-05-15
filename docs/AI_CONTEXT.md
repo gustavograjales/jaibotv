@@ -58,6 +58,9 @@ Gustavo Grajales (`gustavograjales` en GitHub). Trabaja en este proyecto como de
 
 ## Decisiones arquitectónicas clave
 
+8. **`external_id` es EL ancla del canal.** Los scrapes son operaciones de refresh de URLs sobre la DB. Match prioritario por external_id (cuando aplica) y UPDATE por `id` (en refresh masivo). Refresh nunca crea canales: esa responsabilidad es de import/discover. (Decisión 2026-05-15)
+
+
 1. **Xtream Codes API** para compatibilidad universal con clientes IPTV
 2. **M3U devuelve URLs proxy** del tipo `/live/admin/admin123/{stream_id}.ts`, no URLs directas (los tokens del origen rotan cada pocas horas)
 3. **EPG se consolida desde 19 fuentes** (18 ok + 1 error) con columna `priority` (menor = mayor prioridad) para resolver conflictos cuando varias fuentes publican el mismo `epg_id`

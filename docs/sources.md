@@ -238,3 +238,13 @@ Estos errores ocurren en 1+ fuentes específicas (pendiente identificar cuál). 
 | Fuentes EPG totales | 19 | 18 ok + 1 error (Free EPG Ru) |
 | EPG IDs indexados | 7,639 | en `epg_index` |
 | Logos indexados | 3,848 | en `logo-index.json` |
+
+
+## Update 2026-05-15
+
+### tvtv — discover potencial (investigación pendiente)
+URL pattern: `https://tvtvhd.com/vivo/canales.php?stream={stream_param}`. El `stream_param` es string opaco. Viabilidad de barrido (1..n estilo tvpori) depende de si es numérico secuencial o slug. **Confirmar al re-importar CSV en sesión futura.**
+
+### Docker container huérfano: epg-iptv-org
+Contenedor `ghcr.io/iptv-org/epg:master` corriendo en puerto 5000 desde hace 8 días. **NO está consumido por ningún registro en `epg_sources`.** Evaluar post-mudanza si se apaga o se cablea como fuente EPG adicional.
+

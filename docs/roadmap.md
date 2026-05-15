@@ -1,4 +1,19 @@
-# Roadmap — JaiboTV
+# Roadmap
+
+## ✅ Completado 2026-05-15
+
+- `external_id` para tvtv implementado (`tvtv:{stream_param}`)
+- Refactor `scrapeAllTvporiChannels()` para iterar DB en vez de TVPORI_CHANNELS hardcoded
+- Refresh tvpori ahora cubre los 315 canales activos (no solo 69), incluye bulk-importados
+- Update masivo de 41 canales categorizados desde Excel (id-based, sanity check con external_id)
+
+## 🔵 Pendiente lunes 18-may
+
+- Aplicar patch aggregator.js (`external_id` para M3U: `m3u:{source_id}:{tvg-id}` o `m3u:{source_id}:url:{sha1_8}`)
+- Script de migración para los 158 canales M3U sin external_id
+- Investigar viabilidad de discover tvtv (estructura `stream=` analizada, formato no confirmado)
+
+ — JaiboTV
 
 > Estado al: **2026-05-08**
 > Próxima semana de prueba: **11-15 mayo**

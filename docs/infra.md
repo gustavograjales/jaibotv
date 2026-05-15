@@ -1,4 +1,31 @@
-# Infraestructura — JaiboTV
+# Infraestructura
+
+## Update 2026-05-15 — MUDANZA
+
+### Mudanza física a casa
+- **Apagado:** viernes 15-may ~16:00 CST en oficina (Telmex, 192.168.1.250)
+- **Encendido:** sábado 16-may en casa (Totalplay FO, red 192.168.100.x, router Huawei HG8145V5)
+- **Conexión:** WiFi en ambos lados (NO cable ethernet)
+
+### Hallazgo crítico: interfaz de red
+- **Servidor usa WiFi:** `wlp0s20f3` (no `eno1` ni `enp0s*`)
+- **MAC WiFi:** `70:9C:D1:17:95:58` → usar para reservar IP estática en el router de casa
+- Netplan usa NetworkManager (no IP estática hardcoded en yaml), facilita cambio de red
+
+### Estado al apagado
+- 473 canales activos
+- 315 con external_id (todos tvpori)
+- PM2 jaibotv online, uptime 2h, 144 MB
+- Docker `epg-iptv-org` corriendo (8d, huérfano)
+- Disco: 7% usado
+
+### Backups pre-mudanza
+- DB: `~/backups/db/iptv_pre-mudanza_20260515_142618.db` (2.6 MB)
+- Proyecto: `~/backups/iptv-server-pre-mudanza-20260515_142623.tar.gz` (2.3 MB)
+- Network state: `~/network-pre-mudanza.txt`
+- Papelito: `~/papelito-mudanza.txt`
+
+ — JaiboTV
 
 ## Hardware
 
