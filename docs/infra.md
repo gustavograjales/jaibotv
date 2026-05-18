@@ -260,3 +260,94 @@ systemctl status sleep.target suspend.target hibernate.target
 # Si es necesario deshabilitar de nuevo:
 sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 ```
+
+
+---
+
+## Estado de infraestructura — 2026-05-18 (post-mudanza casa)
+
+### Servidor
+
+| Item | Valor |
+|---|---|
+| Hardware | HP EliteBook 840 G7 |
+| OS | Ubuntu 22.04.5 LTS |
+| Hostname | jaibotv |
+| Usuario | ggajales |
+| Path proyecto | /home/ggajales/iptv-server/ |
+| Interfaz red | wlp0s20f3 (WiFi, banda 5GHz) |
+| MAC WiFi | 70:9C:D1:17:95:58 |
+
+### Red local (casa)
+
+| Item | Valor |
+|---|---|
+| ISP | Totalplay (Fibra óptica) |
+| Router | Huawei HG8145V5 |
+| Gateway | 192.168.100.1 |
+| SSID | Totalplay-833-5G |
+| IP local servidor | 192.168.100.250 (DHCP reservation por MAC) |
+| IP pública | 187.189.68.84 |
+| DNS interno | 192.168.100.1 (sin DNS hijacking detectado) |
+
+### DNS público
+
+| Item | Valor |
+|---|---|
+| Dominio | myalpha.fit |
+| Registrar | GoDaddy (renewal anual) |
+| DNS provider | **Cloudflare** (plan Free) |
+| Nameservers | rosemary.ns.cloudflare.com / santino.ns.cloudflare.com |
+| Email | iCloud Mail (mx01/mx02.mail.icloud.com) preservado |
+| DKIM | iCloud sig1._domainkey CNAME preservado (DNS only) |
+| Sitio web | Replit app.myalpha.fit (DNS only, no proxy) |
+
+### Cloudflare Tunnel
+
+| Item | Valor |
+|---|---|
+| Tunnel name | jaibotv-home |
+| Tunnel UUID | 9351f2cf-6c04-47b6-a6ea-5de1872afba2 |
+| Connector ID | 8124c4d8-a56b-493f-87fb-1898ff3e982b |
+| cloudflared version | 2026.5.0 |
+| Servicio | /etc/systemd/system/cloudflared.service (autostart) |
+| Conexiones HA | 4 (mci03 ×2, dfw09, dfw11) |
+| Protocolo | QUIC |
+| Memoria | ~17 MB |
+
+### Public Hostnames (rutas del tunnel)
+
+| Hostname | Service | Auth |
+|---|---|---|
+| tv.myalpha.fit | http://localhost:3000 | (público, sin Access) |
+| ssh.myalpha.fit | ssh://localhost:22 | **Cloudflare Access required** |
+| (catch-all) | http_status:404 | — |
+
+### Cloudflare Access
+
+| Item | Valor |
+|---|---|
+| Application | JaiboTV SSH |
+| Application URL | ssh.myalpha.fit |
+| Policy | Allow Gustavo |
+| Identity provider | One-time PIN (email OTP) |
+| Authorized email | gustavo.grajales@icloud.com |
+| Session duration | 24 hours |
+| Policy ID | 60c0ed61-ba57-4490-95d2-b51959917326 |
+
+### Acceso remoto SSH (desde PC oficina)
+
+**Cliente:** Windows 11 + OpenSSH 9.5p2 + cloudflared 2026.5.0 (en `C:\cloudflared\`)
+
+**Config `~/.ssh/config`:**
+Host <alias>
+HostName <hostname>.myalpha.fit
+User <usuario_servidor>
+ProxyCommand C:\cloudflared\cloudflared.exe access ssh --hostname %h
+ServerAliveInterval 60
+ServerAliveCountMax 3
+**Notas adicionales:**
+- `cloudflared access login` requiere que la Access Application exista y esté propagada (~1-2 min después de crearla)
+- Si reportar `failed to find Access application at https://X` → la app no existe o no propagó
+- Browser-based SSH/RDP/VNC en Access debe quedar OFF si se usa SSH nativo via ProxyCommand
+- Session duration de Access aplica a token cloudflared (24h default), separado del SSH auth (password/key del servidor)

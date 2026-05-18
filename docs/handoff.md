@@ -806,3 +806,66 @@ c7f5e9f (HEAD -> main, origin/main) feat(roadmap): agregar Validador de importac
   - (c) desactivar la fuente `iptv-org México` (id=4) hasta que tengamos staging
 - **Los duplicados del scraper de tvpori probablemente vuelvan a aparecer** en la próxima corrida del cron (3.5h tras el restore). Vigilar y, si aparecen, no usar el método SQL del 7 de mayo (causó corrupción).
 - El proyecto está en buen estado funcional. La prueba de la semana 11-15 puede arrancar con el estado restaurado.
+
+
+---
+
+## Sesión 2026-05-16/17/18 — Mudanza oficina→casa + Cloudflare Tunnel + SSH remoto
+
+### Resumen
+
+Mudanza física del servidor JaiboTV de oficina (Telmex, 192.168.1.250) a casa (Totalplay FO, 192.168.100.250). Migración completa de DNS de GoDaddy a Cloudflare. Tunnel `jaibotv-home` configurado con 2 Public Hostnames (HTTP para tv, SSH protegido por Access para administración remota). Refresh masivo de tokens tvpori con nueva IP pública. Acceso remoto SSH funcional vía `ssh jaibotv` desde PC oficina.
+
+### Cambios aplicados
+
+**Red y servidor:**
+- IP local cambió a 192.168.100.250 (DHCP reservation en Huawei HG8145V5 + perfil NetworkManager mantenido en DHCP)
+- IP pública: 189.175.131.95 (Telmex) → 187.189.68.84 (Totalplay)
+- WiFi: Totalplay-833-5G (banda 5GHz)
+- `ecosystem.config.cjs` actualizado con `SERVER_IP: '192.168.100.250'` en env block. Aplicado con `pm2 delete + pm2 start ecosystem.config.cjs` (no se puede aplicar con simple `pm2 restart`).
+
+**Cloudflare:**
+- Cuenta creada con 2FA
+- Sitio `myalpha.fit` migrado de GoDaddy: 13 DNS records preservados (A, CNAME, MX iCloud, DKIM, TXT SPF/Apple/Replit)
+- Nameservers: rosemary.ns.cloudflare.com / santino.ns.cloudflare.com
+- Tunnel `jaibotv-home` UUID `9351f2cf-6c04-47b6-a6ea-5de1872afba2`, cloudflared 2026.5.0 corriendo como systemd service (4 conexiones HA: mci03 ×2 + dfw09 + dfw11)
+- 2 Public Hostnames: `tv.myalpha.fit → http://localhost:3000` y `ssh.myalpha.fit → ssh://localhost:22`
+- Cloudflare Access: application `JaiboTV SSH` con policy "Allow Gustavo" (email-OTP, sesión 24h). Requerida para SSH porque plan Free NO permite TCP tunnel raw sin Access.
+
+**Cliente SSH (PC oficina):**
+- cloudflared 2026.5.0 instalado en `C:\cloudflared\cloudflared.exe`, agregado al PATH
+- `~/.ssh/config` configurado con alias `jaibotv` y ProxyCommand `cloudflared access ssh --hostname %h`
+- Login Access: `cloudflared access login ssh.myalpha.fit` (OTP por email, token guardado en `.cloudflared/`)
+
+**Datos:**
+- Refresh masivo tvpori: 315/315 canales con tokens nuevos (IP embedida: 187.189.68.84). Comando: `curl -X POST http://localhost:3000/admin/tvpori/scrape`
+- DB integridad confirmada: 473 activos, 315 con external_id
+
+### Hallazgos críticos
+
+1. **JaiboTV NO hace proxy de streams** — el M3U devuelve URLs directas al origen. Contradice `docs/AI_CONTEXT.md` decisión #2. Documentado en `docs/bugs.md` (sección "Hallazgo 2026-05-16") y `docs/roadmap.md` (Backlog técnico decisión arquitectónica).
+
+2. **Streams tvpori IP-locked** — los tokens incluyen la IP pública del servidor codificada en base64 (`MTg3LjE4OS42OC44NA==`). Servidor de origen valida que la IP del cliente final coincida → streams tvpori SOLO funcionan desde redes con la misma IP pública del servidor (WiFi de casa). Desde 4G u otras redes fallan con "There is a problem with streaming". Canales abiertos (no tvpori) funcionan desde cualquier red.
+
+3. **Cloudflare Tunnel TCP raw rechazado en Free plan** — modo `cloudflared access tcp --hostname` sin Access da `websocket: bad handshake`. Solución: configurar Access (gratis hasta 50 usuarios). Modo `cloudflared access ssh` requiere Access también; sin Access, `cloudflared access login` reporta "failed to find Access application".
+
+4. **DNS hijacking en red oficina (Telmex)** — el router 192.168.1.254 reescribía todas las respuestas DNS a IPs 6.6.6.x localmente. No afecta a Cloudflare propagación (confirmado con whatsmydns.net global). En casa (Totalplay) no presenta este comportamiento.
+
+### Estado al cierre
+
+- ✅ `https://tv.myalpha.fit/admin/` accesible desde cualquier red (WiFi, 4G, oficina)
+- ✅ IPTVX vía Xtream Codes (`https://tv.myalpha.fit`, admin/admin123) funcional desde WiFi casa con streams completos
+- ✅ IPTVX desde 4G/otras redes: canales abiertos funcionan, tvpori NO (IP lock documentado)
+- ✅ `ssh jaibotv` desde PC oficina autoritado por Access (sesión 24h)
+- ✅ PM2: jaibotv online, ~25 MB steady; temp-monitor online
+- ✅ cloudflared service uptime estable
+
+### Siguiente sesión
+
+Roadmap inmediato:
+1. **Bloque B-m3u** (aggregator extension con external_id) — pospuesto desde 2026-05-15
+2. **Fix IPMonitor**: agregar disparo de `scrapeAllTvporiChannels()` cuando cambia IP pública (hoy solo dispara tvtv, dejaría tokens stale al cambiar red)
+3. **Hardening SSH** (opcional, fase post-mudanza estable): SSH key auth + `PasswordAuthentication no`
+
+Backlog arquitectónico:
+- Decisión proxy HLS real vs documentar status quo (documentado en bugs.md + roadmap.md)

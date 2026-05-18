@@ -528,3 +528,21 @@ created_at TEXT DEFAULT (datetime('now'))
 
 ---
 
+
+
+## 🔵 Backlog técnico — Decisión arquitectónica proxy M3U
+
+**Origen:** hallazgo 2026-05-16 en sesión post-mudanza. Ver `docs/bugs.md` "Hallazgo 2026-05-16 — M3U devuelve URLs directas al origen, sin proxy".
+
+**Estado:** discrepancia entre `docs/AI_CONTEXT.md` (afirma proxy) y código real (entrega URLs directas).
+
+**Tarea:**
+1. Validar comportamiento desde cliente IPTV real (IPTVX/TiviMate) por al menos 1 semana
+2. Medir incidencia de tokens expirados / streams caídos
+3. Decidir entre 2 caminos:
+   - **A:** implementar proxy HLS real (rewriting de playlist + chunks)
+   - **B:** documentar que el sistema NO hace proxy y actualizar `AI_CONTEXT.md`
+4. Si A: diseñar e implementar como fase aparte del roadmap (no triviaI; requiere streaming HLS bidireccional)
+
+**Prioridad:** baja. El sistema funciona; este es un hallazgo de coherencia documental + decisión arquitectónica diferible.
+

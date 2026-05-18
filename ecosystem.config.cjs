@@ -10,7 +10,8 @@ module.exports = {
     max_memory_restart: '800M',
     env: {
       NODE_ENV: 'production',
-      NODE_OPTIONS: '--max-old-space-size=512'
+      NODE_OPTIONS: '--max-old-space-size=512',
+      SERVER_IP: '192.168.100.250'
     },
     error_file: '/home/ggajales/.pm2/logs/jaibotv-error.log',
     out_file: '/home/ggajales/.pm2/logs/jaibotv-out.log',

@@ -341,3 +341,58 @@ El servidor remoto `:9092` valida algo del cliente más allá de IP y URL/token.
 - Tabla `tvpori_skipped` evita re-mostrar canales descartados
 
 **Status:** WORKAROUND (no hay solución server-side, manejo manual via UI)
+
+
+## Hallazgo 2026-05-16 — M3U devuelve URLs directas al origen, sin proxy
+
+### Discrepancia documentación vs realidad
+
+`docs/AI_CONTEXT.md` (decisión arquitectónica #2) afirma:
+> "M3U devuelve URLs proxy del tipo `/live/admin/admin123/{stream_id}.ts`, no URLs directas (los tokens del origen rotan cada pocas horas)"
+
+**Pero la realidad observada hoy es distinta:** el M3U devuelve URLs DIRECTAS al origen, incluyendo tokens tvpori que rotan cada 4h.
+
+### Evidencia (capturada 2026-05-16 17:13 desde el servidor en casa)
+curl -s "http://localhost:3000/get.php?...&type=m3u" | head -10
+Mostró URLs como:
+https://regionales.saohgdasregions.fun:9092/.../30_.m3u8?token=V9wv7Ov2gxXgX4Wi5NzOSw&expires=1778913722
+https://d2416wdkjdz9sf.cloudfront.net/forotv/forotvm_1280x720_2500k.m3u8
+https://video.cdmx.gob.mx/redes/stream.m3u8
+Conteo de IPs locales (192.168.x.x) en el M3U completo: **0**.
+
+### Análisis de `xtream.js`
+
+- L24: `const ip = config.SERVER_IP` (usado solo como fallback)
+- L38: el host del request tiene prioridad: `req.headers["x-forwarded-host"] || req.hostname || config.SERVER_IP`
+- L116: idem para construcción de `epgUrl`
+
+Esto significa que **el sistema NO implementa proxy de streams**. Los clientes IPTV reciben URLs directas al origen y consumen el stream con su propio cliente HTTP.
+
+### Implicaciones
+
+1. **Riesgo de expiración de tokens:** los tokens tvpori expiran cada 4h. Si el cliente IPTV cachea el M3U más de 4h, los streams dan 403. Mitigación actual: el cron de scrape refresca tokens cada 3.5h y `m3uCache.js` invalida cache en cada scrape.
+2. **Cliente IPTV ve el origen real:** no hay "anonimización". El proveedor del stream sabe la IP del cliente final, no la del servidor JaiboTV.
+3. **No hay rate limiting ni control sobre quién consume el stream:** una vez que el M3U se entrega, el cliente puede compartir las URLs (hasta que el token expire).
+
+### Decisión pendiente — roadmap
+
+La pregunta es: **¿implementar el proxy real o documentar el comportamiento actual como decisión final?**
+
+Trade-offs:
+
+| Aspecto | Con proxy (`/live/.../{stream_id}.ts`) | Sin proxy (estado actual) |
+|---|---|---|
+| Tokens nunca expuestos al cliente | ✅ | ❌ |
+| Servidor consume ancho de banda | ❌ (proxy duplica BW) | ✅ |
+| Control de acceso por canal | ✅ | ❌ |
+| Latencia | Mayor (hop adicional) | Menor (directo origen) |
+| Complejidad implementación | Alta (streaming HLS proxy) | Cero |
+| Acceso a tokens en logs | Cifrado | Visible en URLs |
+
+### Pendiente para sesión de decisión
+
+- [ ] Validar comportamiento real desde cliente IPTV (IPTVX/TiviMate) en condiciones normales
+- [ ] Medir frecuencia de "stream caído por token expirado" en uso real
+- [ ] Decidir si implementar proxy real o actualizar `AI_CONTEXT.md` para reflejar la realidad
+- [ ] Si se decide proxy: diseñar implementación HLS-aware (rewriting de `playlist.m3u8` y `chunk.ts`)
+
